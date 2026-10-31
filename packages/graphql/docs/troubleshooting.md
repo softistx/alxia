@@ -390,6 +390,20 @@ a fraction, `NaN` or a string.
 
 **Fix:** a positive whole number, or `false` for no limit.
 
+### `x-request-id` echoed, or `Request processed` logged, on Yoga 6
+
+**When:** with `@alxia/graphql` before this fix on `graphql-yoga` 6, a request
+carrying `x-request-id: forged` is answered with that header and logged with
+`requestId: "forged"`, and every request logs an INFO `Request processed` line.
+
+**Why:** Yoga 6 trusts the incoming header by default and logs at INFO when
+`logging` is not set. Yoga 5 does neither.
+
+**Fix:** upgrade `@alxia/graphql`. The endpoint passes `requestId: false` (the
+app issues its own id) and defaults `logging` to `'warn'`. To get Yoga's id
+back, pass `requestId: true` (the header stays untrusted) or an object; to get
+the INFO line, pass `logging: true` or `'info'`.
+
 ### `log.child is not a function`
 
 **When:** every request answers 500 with `TypeError: serverContext.log.child is

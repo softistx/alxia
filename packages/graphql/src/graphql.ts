@@ -204,7 +204,13 @@ export function graphql<
 	const page = graphiql ?? true;
 	const yogaAt = yogaServers<UserCtx>(
 		{
+			// Yoga 6 only: the options are unknown to Yoga 5 and ignored there.
+			// The app issues its own request id, so a client-sent `x-request-id`
+			// is never echoed nor logged; and Yoga 6's per-request INFO line
+			// stays off unless the app asks for `logging: true` or 'info'.
 			...(yogaOptions as YogaServerOptions<YogaContext, UserCtx>),
+			...(yogaOptions.logging === undefined ? { logging: 'warn' } : {}),
+			...untrustedRequestId(yogaOptions),
 			plugins: [
 				limitsParsing(limits.tokens, limits.depth),
 				...(yogaOptions.plugins ?? []),
@@ -236,4 +242,19 @@ export function graphql<
 			: graphqlSocket(yogaAt, path, ws === true ? {} : ws),
 	);
 	return app as never;
+}
+
+/**
+ * Yoga 6 reads the client's `x-request-id`, answers with it and tags its
+ * logger with it: log forging. Off by default (the app issues its own id);
+ * an app that turns Yoga's id on keeps `trustHeader: false` unless it sets it.
+ */
+function untrustedRequestId(options: object): object {
+	const { requestId } = options as { requestId?: unknown };
+	if (requestId === undefined) return { requestId: false };
+	if (requestId === true) return { requestId: { trustHeader: false } };
+	if (typeof requestId === 'object' && requestId !== null) {
+		return { requestId: { trustHeader: false, ...requestId } };
+	}
+	return {};
 }
