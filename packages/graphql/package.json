@@ -50,21 +50,22 @@
 		"@alxia/core": "workspace:^",
 		"@alxia/logger": "workspace:^",
 		"@alxia/telemetry": "workspace:^",
+		"@graphql-hive/logger": "^1.1.1",
 		"@envelop/depth-limit": "^7.2.1",
-		"@graphql-yoga/plugin-csrf-prevention": "^3.24.2",
-		"@graphql-yoga/plugin-persisted-operations": "^3.24.2",
+		"@graphql-yoga/plugin-csrf-prevention": "^4.0.1",
+		"@graphql-yoga/plugin-persisted-operations": "^4.0.1",
 		"@nxgt/telemetry": "^0.2.2",
 		"@types/bun": "^1.4.4",
 		"dataloader": "^2.2.3",
 		"graphql": "^16.11.0",
 		"graphql-ws": "^6.3.0",
-		"graphql-yoga": "^5.16.0"
+		"graphql-yoga": "^6.0.1"
 	},
 	"peerDependencies": {
 		"@alxia/core": "workspace:^",
 		"graphql": "^16.11.0 || ^17.0.0",
 		"graphql-ws": "^6.1.0",
-		"graphql-yoga": "^5.16.0",
+		"graphql-yoga": "^5.16.0 || ^6.0.0",
 		"typescript": "^6.0.3 || ^7.0.0"
 	},
 	"peerDependenciesMeta": {

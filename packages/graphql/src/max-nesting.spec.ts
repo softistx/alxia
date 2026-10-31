@@ -7,6 +7,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
 import { createSchema, type Plugin } from 'graphql-yoga';
+import { spyLogger } from '../test/hive-logger';
 import { type GraphQLOptions, graphql } from './graphql';
 import { DEFAULT_MAX_NESTING, nestingLimit, tooDeepAt } from './nesting';
 
@@ -25,16 +26,12 @@ const unclosed = (depth: number) => '{ a '.repeat(depth);
 function serve(
 	options: Partial<GraphQLOptions<never, never, '/graphql'>> = {},
 ) {
-	const errors: unknown[][] = [];
+	const { logger, calls } = spyLogger();
+	const errors = calls['error'] as unknown[][];
 	const app = graphql(alxia(), {
 		schema,
 		ide: false,
-		logging: {
-			debug() {},
-			info() {},
-			warn() {},
-			error: (...args: unknown[]) => void errors.push(args),
-		},
+		logging: logger,
 		batching: true,
 		...options,
 	} as never);
@@ -224,18 +221,8 @@ describe('graphql({ maxNesting, ws })', () => {
 	});
 
 	test('a too-deep subscribe is an error message, the socket stays open, nothing is logged', async () => {
-		const { errors, logging } = (() => {
-			const errors: unknown[][] = [];
-			return {
-				errors,
-				logging: {
-					debug() {},
-					info() {},
-					warn() {},
-					error: (...args: unknown[]) => void errors.push(args),
-				},
-			};
-		})();
+		const { logger: logging, calls } = spyLogger();
+		const errors = calls['error'] as unknown[][];
 		const app = graphql(alxia(), {
 			schema,
 			ide: false,
