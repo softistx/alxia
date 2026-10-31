@@ -31,7 +31,7 @@ Nothing scheduled yet.
 
 ## Not planned
 
-- **Several tenants in one database.** A `schoolId`-style field on every
+- **Several tenants in one database.** A `tenantId`-style field on every
   document is a different isolation model; a query with a bug could cross it.
   The two stores keep a tenant's data in a database of its own, or alone.
 - **A tenant resolved from a host name or a path.** The tenant comes from a

@@ -32,6 +32,8 @@ There is no mode of this package without them.
 
 ## `emit("x") needs the handle of a transaction`
 
+`EventsError` `events.no-transaction`.
+
 **When:** `events.emit` is given `scope.mongo` instead of the `tx` of a
 `mongo.transaction(async (tx) => ...)`.
 
@@ -51,18 +53,18 @@ If the event has no change to go with it, pass `{ standalone: true }`.
 
 ## `"x" is not in any module's emits`
 
-`EventsError` `undeclared-type`. Add the type to the `emits` of the module that
+`EventsError` `events.undeclared-type`. Add the type to the `emits` of the module that
 owns it, in the registry the store and `createEvents` share.
 
 ## `the payload of "x" is not JSON data`
 
-`EventsError` `invalid-payload`. The payload holds a `Date`, an `ObjectId`, a
+`EventsError` `events.invalid-payload`. The payload holds a `Date`, an `ObjectId`, a
 `Map` or a class instance, which a queue would turn into something else. Send
 `date.toISOString()` and `id.toHexString()`.
 
 ## `module "m" subscribes to "x", which no module in the registry emits`
 
-`EventsError` `unknown-subscription`, at boot. The type is misspelled, or the
+`EventsError` `events.unknown-subscription`, at boot. The type is misspelled, or the
 emitting module is not in the registry. Register it, or fix the key of
 `subscribers`.
 
@@ -92,18 +94,18 @@ given at all; `drain()` needs none.
 
 ## `module "m" has no subscriber for "x" in this process's registry`
 
-`EventsError` `unknown-subscription`, thrown in a worker. The job came from a process whose registry has a subscriber the worker's registry lacks (an older or different deploy). Deploy workers with the registry of the emitter; the job is retried and lands in the dead letters until then.
+`EventsError` `events.unknown-subscription`, thrown in a worker. The job came from a process whose registry has a subscriber the worker's registry lacks (an older or different deploy). Deploy workers with the registry of the emitter; the job is retried and lands in the dead letters until then.
 
 ## `collection "_outbox" of module "events" is not wired in the tenant database`
 
-A `ModuleWiringError` from `@alxia/tenancy`. The tenant databases were wired
+A `ModuleWiringError` (`tenancy.module-wiring`) from `@alxia/tenancy`. The tenant databases were wired
 with collections that do not include the registry's. Build the wiring from the
 registry (`collectionsOf(modules)` of `@alxia/modules`) so `_outbox` and
 `_inbox` are in it.
 
 ## `drain still found events after 100 rounds`
 
-`EventsError` `drain-diverged`. A subscriber emits an event that, through its
+`EventsError` `events.drain-diverged`. A subscriber emits an event that, through its
 own subscriber, emits again. Break the loop, or test it with the relay.
 
 ## Events stay pending

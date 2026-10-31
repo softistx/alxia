@@ -112,7 +112,9 @@ function uniqueNames(
 			if (first !== undefined) {
 				throw new ModuleGraphError(
 					'modules.duplicate-declaration',
-					`${what} "${name}" is declared by two modules ("${first}" and "${module.name}")`,
+					first === module.name
+						? `module "${module.name}" lists ${what} "${name}" twice`
+						: `${what} "${name}" is declared by two modules ("${first}" and "${module.name}")`,
 				);
 			}
 			owner.set(name, module.name);

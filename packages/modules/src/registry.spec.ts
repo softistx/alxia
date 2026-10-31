@@ -197,6 +197,16 @@ describe('boot errors share one shape: a namespaced code and a message', () => {
 		);
 	});
 
+	test('a module listing a name twice is worded as such', () => {
+		const error = refusal(() =>
+			permissionsOf([
+				defineModule({ name: 'x', permissions: ['k:read', 'k:read'] }),
+			]),
+		);
+		expect(error.code).toBe('modules.duplicate-declaration');
+		expect(error.message).toBe('module "x" lists permission "k:read" twice');
+	});
+
 	test('an event type two modules emit is refused', () => {
 		const twice = [
 			defineModule({ name: 'x', emits: ['x.a.b'] }),
