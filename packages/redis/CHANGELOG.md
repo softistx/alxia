@@ -1,5 +1,11 @@
 # @alxia/redis
 
+## 0.6.0
+
+### Minor Changes
+
+- [#472](https://github.com/softistx/alxia/pull/472) [`ba9d091`](https://github.com/softistx/alxia/commit/ba9d0919deb727e867bbfa1a673e02d5bb1c1177) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `@nxgt/redis` peer range is now `^0.9.0` (was `^0.7.0 || ^0.8.0 || ^0.9.0`). The workspace's floor-peers check needs every package to agree on the lowest `@nxgt/redis` it builds against, and `@alxia/events` needs 0.9.0, the first release with the queue. An app on `@nxgt/redis` 0.7 or 0.8 bumps it to 0.9.
+
 ## 0.5.13
 
 ### Patch Changes

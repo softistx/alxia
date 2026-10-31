@@ -41,7 +41,7 @@
     },
     "packages/access": {
       "name": "@alxia/access",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "devDependencies": {
         "@alxia/modules": "workspace:^",
         "@types/bun": "^1.4.4",
@@ -171,7 +171,7 @@
     },
     "packages/events": {
       "name": "@alxia/events",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "devDependencies": {
         "@alxia/modules": "workspace:^",
         "@alxia/tenancy": "workspace:^",
@@ -295,7 +295,7 @@
     },
     "packages/modules": {
       "name": "@alxia/modules",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "devDependencies": {
         "@types/bun": "^1.4.4",
       },
@@ -416,7 +416,7 @@
     },
     "packages/redis": {
       "name": "@alxia/redis",
-      "version": "0.5.13",
+      "version": "0.6.0",
       "devDependencies": {
         "@alxia/cache": "workspace:^",
         "@alxia/core": "workspace:^",
@@ -468,7 +468,7 @@
     },
     "packages/tenancy": {
       "name": "@alxia/tenancy",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "devDependencies": {
         "@alxia/modules": "workspace:^",
         "@nxgt/mongo": "^0.24.0",
