@@ -4,6 +4,7 @@ import {
 	beforeAll,
 	describe,
 	expect,
+	setDefaultTimeout,
 	test,
 } from 'bun:test';
 import { bindQueue } from '@nxgt/redis';
@@ -21,14 +22,32 @@ import {
 import { createEvents, type EventsQueueOptions, eventsQueue } from '.';
 import { toWire } from './envelope';
 
+// Bun fails a test after 5 s. Each one starts a MongoDB replica-set client and
+// a Redis connection, which a loaded CI runner cannot always do in that time.
+setDefaultTimeout(30_000);
+
 // These specs need Redis: `$REDIS_URL` (CI's service container), else a
 // `redis-server` on PATH started on a free port. With neither they fail.
 // Every module, queue and lock name is unique per test, and each test deletes
 // its own keys, so a shared Redis is never flushed.
+//
+// The specs run on Redis database 7, not 0. `@alxia/redis`'s specs share the
+// service container, run at the same time in CI, and they `FLUSHDB` and
+// `KEYS *` database 0: a flush there deleted this file's queues mid-test (1 waiting job
+// instead of 3, a worker that never ran).
+const DATABASE = 7;
+const inOwnDatabase = (base: string) => {
+	const parsed = new URL(base);
+	parsed.pathname = `/${DATABASE}`;
+	return parsed.toString();
+};
 let url = process.env['REDIS_URL'];
 let server: Bun.Subprocess | undefined;
 beforeAll(async () => {
-	if (url !== undefined) return;
+	if (url !== undefined) {
+		url = inOwnDatabase(url);
+		return;
+	}
 	const binary = Bun.which('redis-server');
 	if (binary === null) {
 		throw new Error(
@@ -40,7 +59,7 @@ beforeAll(async () => {
 		[binary, '--port', String(port), '--save', '', '--appendonly', 'no'],
 		{ stdout: 'ignore', stderr: 'ignore' },
 	);
-	url = `redis://127.0.0.1:${port}`;
+	url = inOwnDatabase(`redis://127.0.0.1:${port}`);
 	for (let attempt = 0; ; attempt++) {
 		try {
 			const probe = new RedisClient(url);
@@ -55,7 +74,7 @@ beforeAll(async () => {
 });
 afterAll(() => server?.kill());
 
-const until = async (check: () => Promise<boolean>, ms = 8_000) => {
+const until = async (check: () => Promise<boolean>, ms = 20_000) => {
 	const deadline = Date.now() + ms;
 	while (!(await check())) {
 		if (Date.now() > deadline) throw new Error('timed out');
@@ -86,8 +105,10 @@ async function setup(queueOptions: EventsQueueOptions = {}) {
 	const definition = eventsQueue(billing, queueOptions);
 	const queue = bindQueue(client, definition);
 	cleanup.push(async () => {
+		// The queue's keys are `queue:{<name>}:…`; the braces end the name, so
+		// this one never matches another queue whose name it prefixes.
 		const keys = (await client.send('KEYS', [
-			`*${definition.name}*`,
+			`queue:{${definition.name}}:*`,
 		])) as string[];
 		if (keys.length) await client.send('DEL', keys);
 		const locks = (await client.send('KEYS', [

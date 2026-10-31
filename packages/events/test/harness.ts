@@ -61,8 +61,12 @@ export async function closeTestClient() {
 }
 
 let counter = 0;
+// Two processes can share one Redis (CI's service container is the runner's):
+// a clock and a counter are the same in two jobs that start together, so a
+// random part keeps their queue and lock names apart.
+const run = crypto.randomUUID().slice(0, 8);
 export const unique = (what: string) =>
-	`events_${what}_${Date.now().toString(36)}_${++counter}`;
+	`events_${what}_${run}_${Date.now().toString(36)}_${++counter}`;
 
 /**
  * The registry of the specs: `shop` emits, `<billing>` subscribes, and the
