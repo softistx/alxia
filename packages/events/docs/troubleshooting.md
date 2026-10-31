@@ -6,7 +6,7 @@
 - [`the payload of "x" is not JSON data`](#the-payload-of-x-is-not-json-data)
 - [`module "m" subscribes to "x", which no module in the registry emits`](#module-m-subscribes-to-x-which-no-module-in-the-registry-emits)
 - [`the registry lacks eventsModule`](#the-registry-lacks-eventsmodule)
-- [`invalid-type`, `duplicate-emit` and `foreign-type`](#invalid-type-duplicate-emit-and-foreign-type)
+- [`invalid-type`, `duplicate-declaration` and `foreign-type`](#invalid-type-duplicate-declaration-and-foreign-type)
 - [`tenant-mismatch`](#tenant-mismatch)
 - [`this needs the bound events.<module> queues`](#this-needs-the-bound-eventsmodule-queues)
 - [`module "m" has no subscriber for "x" in this process's registry`](#module-m-has-no-subscriber-for-x-in-this-processs-registry)
@@ -66,9 +66,9 @@ owns it, in the registry the store and `createEvents` share.
 emitting module is not in the registry. Register it, or fix the key of
 `subscribers`.
 
-## `invalid-type`, `duplicate-emit` and `foreign-type`
+## `invalid-type`, `duplicate-declaration` and `foreign-type`
 
-`EventsError`, at boot. `module "m" emits "x", which is not <module>.<entity>.<verb> in lower case`: rename the type (`shop.order.placed`). `event type "x" is declared by two modules`: a type has one owner; keep it in one module's `emits`. `foreign-type`: `module "a" emits "b.order.placed"`, whose first segment is not its own name; a module emits only the types it owns (`a.…`), so move the entry to `b`.
+`EventsError` (`events.invalid-type`, `events.foreign-type`), at boot. `module "m" emits "x", which is not <module>.<entity>.<verb> in lower case`: rename the type (`shop.order.placed`). `event type "x" is declared by two modules`, a `ModuleGraphError` (`modules.duplicate-declaration`) from `@alxia/modules`: a type has one owner; keep it in one module's `emits`. `foreign-type`: `module "a" emits "b.order.placed"`, whose first segment is not its own name; a module emits only the types it owns (`a.…`), so move the entry to `b`.
 
 ## `tenant-mismatch`
 
@@ -76,19 +76,19 @@ emitting module is not in the registry. Register it, or fix the key of
 
 ## `the registry lacks eventsModule`
 
-`EventsError` `module-missing`. Add `eventsModule` to the list given to the
+`EventsError` `events.module-missing`. Add `eventsModule` to the list given to the
 tenant store (`modules`): it owns `_outbox` and `_inbox`.
 
 ## `module "m" has subscribers but no queue`
 
-`EventsError` `missing-queue`. `queues` is given but has no entry for a module
+`EventsError` `events.missing-queue`. `queues` is given but has no entry for a module
 that subscribes. Add `{ m: bindQueue(client, eventsQueue('m')) }`. The error
 is also thrown by `relay()`, `work()` and `deadLetters()` when `queues` was not
 given at all; `drain()` needs none.
 
 ## `this needs the bound events.<module> queues`
 
-`EventsError` `missing-queue`, from `relay()`, `work()` or `deadLetters()` when `createEvents` was built without `queues`. Pass `{ queues }` (see the entry below). `drain()` needs none.
+`EventsError` `events.missing-queue`, from `relay()`, `work()` or `deadLetters()` when `createEvents` was built without `queues`. Pass `{ queues }` (see the entry below). `drain()` needs none.
 
 ## `module "m" has no subscriber for "x" in this process's registry`
 

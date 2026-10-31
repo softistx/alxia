@@ -1,9 +1,20 @@
 import type { Module, ModuleJob } from './module';
 
+export type ModuleGraphErrorCode =
+	| 'modules.duplicate-module'
+	| 'modules.unknown-dependency'
+	| 'modules.dependency-cycle'
+	| 'modules.duplicate-declaration';
+
 // A registry that cannot be loaded or read: a module named twice, a
-// dependency that is not registered, a cycle, a name two modules declare.
+// dependency that is not registered, a cycle, a name two modules declare
+// (a collection, a text, a permission, an emitted event type). `code` is
+// stable and namespaced `modules.`, like every boot error of the kernel.
 export class ModuleGraphError extends Error {
-	constructor(message: string) {
+	constructor(
+		readonly code: ModuleGraphErrorCode,
+		message: string,
+	) {
 		super(message);
 		this.name = 'ModuleGraphError';
 	}
@@ -15,7 +26,10 @@ export function resolveModules(list: readonly Module[]): readonly Module[] {
 	const byName = new Map<string, Module>();
 	for (const module of list) {
 		if (byName.has(module.name)) {
-			throw new ModuleGraphError(`module "${module.name}" is registered twice`);
+			throw new ModuleGraphError(
+				'modules.duplicate-module',
+				`module "${module.name}" is registered twice`,
+			);
 		}
 		byName.set(module.name, module);
 	}
@@ -23,6 +37,7 @@ export function resolveModules(list: readonly Module[]): readonly Module[] {
 		for (const dependency of module.dependsOn ?? []) {
 			if (!byName.has(dependency)) {
 				throw new ModuleGraphError(
+					'modules.unknown-dependency',
 					`module "${module.name}" depends on "${dependency}", which is not registered`,
 				);
 			}
@@ -35,7 +50,10 @@ export function resolveModules(list: readonly Module[]): readonly Module[] {
 		if (seen === 'done') return;
 		if (seen === 'visiting') {
 			const cycle = [...path.slice(path.indexOf(module.name)), module.name];
-			throw new ModuleGraphError(`dependency cycle: ${cycle.join(' -> ')}`);
+			throw new ModuleGraphError(
+				'modules.dependency-cycle',
+				`dependency cycle: ${cycle.join(' -> ')}`,
+			);
 		}
 		state.set(module.name, 'visiting');
 		for (const dependency of module.dependsOn ?? []) {
@@ -48,6 +66,8 @@ export function resolveModules(list: readonly Module[]): readonly Module[] {
 	// Fails here rather than at the first reader that merges them.
 	collectionsOf(ordered);
 	coreCollectionsOf(ordered);
+	permissionsOf(ordered);
+	emitsOf(ordered);
 	return ordered;
 }
 
@@ -62,6 +82,7 @@ function mergeRecords<T>(
 		for (const [key, value] of Object.entries(pick(module) ?? {})) {
 			if (key in merged) {
 				throw new ModuleGraphError(
+					'modules.duplicate-declaration',
 					`${what} "${key}" is declared by two modules ("${owner.get(key)}" and "${module.name}")`,
 				);
 			}
@@ -78,10 +99,38 @@ export const typeDefsOf = (modules: readonly Module[]): string[] =>
 export const codesOf = (modules: readonly Module[]): string[] =>
 	modules.flatMap((module) => module.codes ?? []);
 
-// Every permission once, in the order the modules declare them.
+// Declares `what` once per name: a second module naming it is refused.
+function uniqueNames(
+	modules: readonly Module[],
+	pick: (module: Module) => readonly string[] | undefined,
+	what: string,
+): Map<string, string> {
+	const owner = new Map<string, string>();
+	for (const module of modules) {
+		for (const name of pick(module) ?? []) {
+			const first = owner.get(name);
+			if (first !== undefined) {
+				throw new ModuleGraphError(
+					'modules.duplicate-declaration',
+					`${what} "${name}" is declared by two modules ("${first}" and "${module.name}")`,
+				);
+			}
+			owner.set(name, module.name);
+		}
+	}
+	return owner;
+}
+
+// Every permission once, in the order the modules declare them. A permission
+// two modules declare is a `ModuleGraphError`, never merged silently.
 export const permissionsOf = (modules: readonly Module[]): string[] => [
-	...new Set(modules.flatMap((module) => module.permissions ?? [])),
+	...uniqueNames(modules, (module) => module.permissions, 'permission').keys(),
 ];
+
+// The event types the modules emit, by owning module, in declaration order. A
+// type two modules declare is a `ModuleGraphError`.
+export const emitsOf = (modules: readonly Module[]): Map<string, string> =>
+	uniqueNames(modules, (module) => module.emits, 'event type');
 
 // The permissions each role holds by default, across modules.
 export function defaultGrantsOf(

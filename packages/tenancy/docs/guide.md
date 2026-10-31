@@ -221,14 +221,18 @@ Tenants are visited one after the other; an error stops the loop.
 ## Provisioning
 
 ```ts
-const school = await tenancy.provision({ slug: 'north', name: 'North' }, actorId);
+const tenant = await tenancy.provision({ slug: 'north', name: 'North' }, actorId);
 ```
 
 `provision` registers the tenant (`provisioning`), syncs its collections
 (validators and indexes, only the ones `configure` wires, never the core's),
 runs the tenant migrations, then activates it. It needs the `dbAdmin` role: it
 is a deployment step, never a request. A taken slug is a `TenancyError`
-`tenancy.errors.slug-taken`. If the database step fails the tenant stays
+`tenancy.errors.slug-taken`. (The refusal codes keep their `tenancy.errors.`
+namespace: existing hosts translate them already, and they match `perOrganization`
+and the `x-organization-id` header. The boot errors, `tenancy.module-wiring` and
+`tenancy.unknown-migration`, are the kernel's own shape: a `code` and a message.)
+If the database step fails the tenant stays
 `provisioning`. The retry is the host's: fix the cause, call `tenancy.prepare(id)`, then `registry.activate(tenant, actor)`.
 
 ## Sync and migrations

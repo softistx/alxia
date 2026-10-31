@@ -31,8 +31,8 @@ export interface ModuleDefinition<Name extends string = string> {
 	resolvers?: Readonly<Record<string, unknown>>;
 	// What the module's service is, built per request from the request's scope.
 	services?: (scope: never) => unknown;
-	// Permissions the module declares (`sales:write`) and the roles that hold
-	// them by default.
+	// Permissions the module declares, each `<area>:read` or `<area>:manage`
+	// (`notes:read`, `notes:manage`), and the roles that hold them by default.
 	permissions?: readonly string[];
 	defaultGrants?: Readonly<Record<string, readonly string[]>>;
 	// The module's error codes.

@@ -19,8 +19,9 @@ export class TenancyError extends Error {
 	}
 }
 
-/** A rollback target that no migration list holds. */
+/** A rollback target that no migration list holds. `code` is `tenancy.unknown-migration`. */
 export class UnknownMigrationError extends Error {
+	readonly code = 'tenancy.unknown-migration';
 	constructor(readonly id: string) {
 		super(`rollback: "${id}" is in no migration list`);
 		this.name = 'UnknownMigrationError';
@@ -39,9 +40,10 @@ export const slugTaken = (slug: string) =>
 /**
  * A module the store cannot hand out: the name is not in its `modules`, or a
  * collection the module (or a `dependsOn`) declares is missing from the wiring
- * of the database it belongs to.
+ * of the database it belongs to. `code` is `tenancy.module-wiring`.
  */
 export class ModuleWiringError extends Error {
+	readonly code = 'tenancy.module-wiring';
 	constructor(message: string) {
 		super(message);
 		this.name = 'ModuleWiringError';

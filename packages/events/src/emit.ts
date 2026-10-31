@@ -24,20 +24,20 @@ export async function emitEvent(
 ): Promise<EventEnvelope> {
 	if (!declared.has(input.type)) {
 		throw new EventsError(
-			'undeclared-type',
+			'events.undeclared-type',
 			`"${input.type}" is not in any module's emits`,
 		);
 	}
 	if (!isJson(input.payload)) {
 		throw new EventsError(
-			'invalid-payload',
+			'events.invalid-payload',
 			`the payload of "${input.type}" is not JSON data (a Date, an ObjectId or a class instance does not survive a queue): send ISO strings and hex ids`,
 		);
 	}
 	const { mongo } = source;
 	if (mongo.session === undefined && !options.standalone) {
 		throw new EventsError(
-			'no-transaction',
+			'events.no-transaction',
 			`emit("${input.type}") needs the handle of a transaction (mongo.transaction(tx => ...)), so the event commits with the change; pass { standalone: true } to write it alone`,
 		);
 	}

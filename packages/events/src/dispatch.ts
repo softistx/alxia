@@ -58,7 +58,7 @@ export async function dispatchPending(
 				// A row copied from another tenant's database, or written by hand: it
 				// would reach subscribers under a tenant it does not belong to.
 				throw new EventsError(
-					'tenant-mismatch',
+					'events.tenant-mismatch',
 					`the outbox of tenant "${tenant}" holds event ${row._id.toHexString()} of tenant "${row.tenant}"`,
 				);
 			}

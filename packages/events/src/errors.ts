@@ -1,15 +1,14 @@
 export type EventsErrorCode =
-	| 'invalid-type'
-	| 'undeclared-type'
-	| 'duplicate-emit'
-	| 'foreign-type'
-	| 'tenant-mismatch'
-	| 'unknown-subscription'
-	| 'module-missing'
-	| 'missing-queue'
-	| 'no-transaction'
-	| 'invalid-payload'
-	| 'drain-diverged';
+	| 'events.invalid-type'
+	| 'events.undeclared-type'
+	| 'events.foreign-type'
+	| 'events.tenant-mismatch'
+	| 'events.unknown-subscription'
+	| 'events.module-missing'
+	| 'events.missing-queue'
+	| 'events.no-transaction'
+	| 'events.invalid-payload'
+	| 'events.drain-diverged';
 
 /**
  * A refusal of the event bus: at boot (a type nobody declares, a subscriber

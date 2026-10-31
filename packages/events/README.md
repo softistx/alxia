@@ -112,12 +112,12 @@ await events.drain(scope.tenant.id); // omit the tenant to drain every tenant
 | `events.relay(options)` | `tick()`, `start()`, `stop()`: a leader-locked poll that enqueues jobs |
 | `events.work(options?)` | one `@nxgt/redis` worker per subscribing module's queue |
 | `events.deadLetters({ limit? })` | the jobs that used all their attempts |
-| `eventsQueue(module, options?)`, `queueName(module)` | the definition of `events.<module>` |
-| `deliver(store, mongo, tenant, event, subscription)` | one subscriber, once: inbox row plus handler in a transaction, handed its module's narrowed scope |
-| `emittedTypes(modules)`, `subscriptionsOf(modules)` | the registry readers behind the boot checks |
+| `eventsQueue(module, options?)`, `queueName(module)`, `EventsQueueOptions`, `EventQueue`, `EventJob` | the definition of `events.<module>`, its options, the bound queue's type and a job's payload |
+| `deliver(store, mongo, tenant, event, subscription)`, `Delivery` | one subscriber, once: inbox row plus handler in a transaction, handed its module's narrowed scope |
+| `emittedTypes(modules)`, `subscriptionsOf(modules)`, `Subscription` | the registry readers behind the boot checks, and one module's handler for one type |
 | `outbox`, `inbox`, `OUTBOX_TTL`, `INBOX_TTL` | the collection definitions and TTLs |
-| `EventsError` | the refusals, with a stable `code` |
-| `EventEnvelope`, `EventInput`, `EmitSource`, `EventsMongo`, `Subscriber`, `SubscriberContext`, `DeadLetter`, `Relay`, `RelayOptions`, `Events`, `EventsOptions` | the types |
+| `EventsError`, `EventsErrorCode` | the refusals, with a stable `code` namespaced `events.` (`events.undeclared-type`, `events.missing-queue`, ...) |
+| `EventEnvelope`, `EventInput`, `EmitOptions`, `EventWorkers`, `EmitSource`, `EventsMongo`, `Subscriber`, `SubscriberContext`, `DeadLetter`, `Relay`, `RelayOptions`, `Events`, `EventsOptions` | the types |
 
 Peers: `@alxia/modules`, `@alxia/tenancy`, `@nxgt/mongo`, `@nxgt/redis`,
 `mongodb`, `zod`, `typescript`.

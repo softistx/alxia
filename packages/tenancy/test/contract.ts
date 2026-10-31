@@ -38,7 +38,7 @@ export function describeTenantStore(
 		beforeAll(async () => {
 			h = await make();
 			tenant = await h.store.provision(
-				{ slug: 'contract-school', name: 'Contract' },
+				{ slug: 'contract-tenant', name: 'Contract' },
 				ACCOUNT_A,
 			);
 		});

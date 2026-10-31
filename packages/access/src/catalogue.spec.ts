@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { defineModule } from '@alxia/modules';
+import { defineModule, ModuleGraphError } from '@alxia/modules';
 import { accessFor, roles } from '../test/harness';
 import { createAccess } from './catalogue';
 import { AccessCatalogueError } from './errors';
@@ -108,6 +108,35 @@ describe('a catalogue that cannot be built (boot errors)', () => {
 		expect(() => accessFor([sales, other])).toThrow(
 			/"sales:read" is declared by two modules \("sales" and "other"\)/,
 		);
+		// The registry's error, with the registry's code.
+		expect(() => accessFor([sales, other])).toThrow(ModuleGraphError);
+	});
+
+	test('every boot error has a namespaced code', () => {
+		const other = defineModule({ name: 'other', permissions: ['sales:read'] });
+		const code = (modules: Parameters<typeof accessFor>[0]) => {
+			try {
+				accessFor(modules);
+			} catch (error) {
+				return (error as { code: string }).code;
+			}
+			return undefined;
+		};
+		expect(
+			code([defineModule({ name: 'bad', permissions: ['sales:write'] })]),
+		).toBe('access.invalid-permission');
+		expect(
+			code([defineModule({ name: 'x', defaultGrants: { nobody: [] } })]),
+		).toBe('access.unknown-role');
+		expect(
+			code([
+				defineModule({
+					name: 'x',
+					defaultGrants: { member: ['sales:read'] },
+				}),
+			]),
+		).toBe('access.undeclared-grant');
+		expect(code([sales, other])).toBe('modules.duplicate-declaration');
 	});
 
 	test('a permission that is not <area>:read|manage', () => {

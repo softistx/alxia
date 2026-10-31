@@ -98,11 +98,13 @@ describe('emit', () => {
 					),
 				)
 				.catch((e: EventsError) => e.code);
-		expect(await code('shop.order.shipped', {})).toBe('undeclared-type');
+		expect(await code('shop.order.shipped', {})).toBe('events.undeclared-type');
 		expect(await code('shop.order.placed', { at: new Date() })).toBe(
-			'invalid-payload',
+			'events.invalid-payload',
 		);
-		expect(await code('shop.order.placed', {}, true)).toBe('no-transaction');
+		expect(await code('shop.order.placed', {}, true)).toBe(
+			'events.no-transaction',
+		);
 		// Written alone only on request.
 		const alone = await events.emit(
 			{ tenant, mongo },
@@ -289,7 +291,7 @@ describe('failure paths', () => {
 		const { tenant, mongo } = await soleTenant(store);
 		await place(events, tenant, mongo, 'a');
 		await expect(events.drain('only')).rejects.toMatchObject({
-			code: 'drain-diverged',
+			code: 'events.drain-diverged',
 		});
 	});
 
@@ -310,7 +312,7 @@ describe('failure paths', () => {
 			{ $set: { tenant: 'elsewhere' } },
 		);
 		await expect(events.drain('only')).rejects.toMatchObject({
-			code: 'tenant-mismatch',
+			code: 'events.tenant-mismatch',
 		});
 		expect(calls).toBe(0);
 		expect(

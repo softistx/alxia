@@ -22,8 +22,8 @@ export const notes = defineModule({
 	dependsOn: ['accounts'],
 	collections: { notes: notesCollection },
 	typeDefs: [noteSdl],
-	permissions: ['notes:read', 'notes:write'],
-	defaultGrants: { editor: ['notes:read', 'notes:write'] },
+	permissions: ['notes:read', 'notes:manage'],
+	defaultGrants: { editor: ['notes:read', 'notes:manage'] },
 	texts: { en: { 'notes.errors.locked': 'This note is locked.' } },
 });
 
@@ -78,10 +78,10 @@ rest of the package is plain TypeScript.
 | --- | --- |
 | `defineModule(definition)` | the manifest, frozen, with its literal type kept |
 | `resolveModules(list)` | checks the list and returns it in dependency order; throws `ModuleGraphError` |
-| `typeDefsOf`, `codesOf`, `permissionsOf`, `defaultGrantsOf`, `collectionsOf`, `coreCollectionsOf`, `migrationsOf`, `coreMigrationsOf`, `jobsOf`, `textsOf` | what the host reads from a resolved list |
+| `typeDefsOf`, `codesOf`, `permissionsOf`, `emitsOf`, `defaultGrantsOf`, `collectionsOf`, `coreCollectionsOf`, `migrationsOf`, `coreMigrationsOf`, `jobsOf`, `textsOf` | what the host reads from a resolved list |
 | `assertBoundaries(registry, glob, options)` | a test helper: throws listing every import that breaks the boundaries (Bun only) |
 | `boundaryViolations(files, registry, options)`, `importsOf(text)` | the pure checker, and the import scanner it uses |
-| `ModuleGraphError` | the error `resolveModules` and the readers throw |
+| `ModuleGraphError`, `ModuleGraphErrorCode` | the error `resolveModules` and the readers throw: a `code` (`modules.duplicate-module`, `modules.unknown-dependency`, `modules.dependency-cycle`, `modules.duplicate-declaration`) and a message. `permissionsOf` and `emitsOf` throw it for a permission or an event type two modules declare, never merging silently |
 | `Register` | merged by the app to name its registry |
 | `ModuleMongo`, `ModuleHandle`, `ModuleCoreMongo`, `ModuleCoreHandle`, `ModuleName`, `CollectionsOf`, `CoreCollectionsOf`, `ViewOf`, `Registered` | the types derived from the registry |
 | `Module`, `ModuleDefinition`, `ModuleJob`, `NamedJob`, `BoundaryOptions`, `BoundaryViolation` | the other types |

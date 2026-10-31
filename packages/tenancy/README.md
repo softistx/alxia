@@ -116,7 +116,7 @@ await tenancy.eachTenant(visit, { withDeleted: true }); // every registered one
 ## Provision, sync, migrate
 
 ```ts
-const school = await tenancy.provision({ slug: 'north', name: 'North' }, actorId);
+const tenant = await tenancy.provision({ slug: 'north', name: 'North' }, actorId);
 // registered as `provisioning`, database synced and migrated, then `active`
 
 // throws a TenancyError `tenancy.errors.slug-taken` (409) when the slug is taken
@@ -160,19 +160,31 @@ database.reset(); // between tests
 
 | Export | What it does |
 | --- | --- |
-| `perOrganization(options)` | the core database plus one database per organisation |
-| `single(options)` | one database, one fixed tenant |
+| `perOrganization(options)`, `PerOrganizationOptions`, `PerOrganizationStore` | the core database plus one database per organisation |
+| `single(options)`, `SingleOptions`, `SingleStore` | one database, one fixed tenant |
 | `TenantStore` | the contract both answer: `resolve`, `tenantOf`, `databaseOf`, `scope`, `forModule`, `eachTenant`, `provision`, `prepare`, `sync`, `migrate`, `close` |
 | `lazyScope(store, request, viewer)` | a request's scope, resolved once, on first use |
-| `viewerMemberships(membership, viewer)` | the viewer's membership in any tenant, read once per request |
-| `slotNaming(prefix, slots)` | `<prefix>_slot<n>` database names for tests |
-| `createTenantDatabases(options)`, `isTenantId`, `dbOf` | the bounded cache of tenant `Mongo`s, the check on ids that reach a database name, the driver's `Db` under a `Mongo` |
+| `viewerMemberships(membership, viewer)`, `ViewerMemberships` | the viewer's membership in any tenant, read once per request |
+| `slotNaming(prefix, slots)`, `SlotNaming`, `DatabaseNaming` | `<prefix>_slot<n>` database names for tests, and the type of a `database` option (a prefix or a function from the tenant id) |
+| `createTenantDatabases(options)`, `TenantDatabases`, `TenantDatabasesOptions`, `isTenantId`, `dbOf` | the bounded cache of tenant `Mongo`s, the check on ids that reach a database name, the driver's `Db` under a `Mongo` |
 | `ModuleScope`, `ModuleSource` | what `forModule` returns (`mongo`, `core`) and takes: a scope, or `{ mongo, core: store.core }` for the tenant `eachTenant` visits |
-| `TenancyError`, `UnknownMigrationError`, `ModuleWiringError` | the refusals |
+| `TenancyError`, `TenancyErrorCode`, `UnknownMigrationError`, `ModuleWiringError` | the refusals (`tenancy.errors.*`, see below) and the two boot errors, with the codes `tenancy.unknown-migration` and `tenancy.module-wiring` |
 | `organizationRequired(header)`, `unknownOrganization()`, `slugTaken(slug)` | the `TenancyError`s the stores throw, for a host's own store or spec to throw the same ones |
 | `DEFAULT_HEADER` | `'x-organization-id'`, the header when `header` is not given |
 | `noMembers` | a `Membership` that admits nobody, for a spec or a locked-down host |
-| `Tenant`, `TenantRegistry`, `Membership`, `TenantScope`, `Viewer`, `Resolution`, `MigrateMode`, `MigrationOutcome` | the types |
+| `Tenant`, `TenantStatus`, `TenantRegistry`, `Membership`, `TenantScope`, `Viewer`, `Resolution`, `EachTenantOptions`, `MigrationLists`, `MigrateMode`, `MigrationOutcome` | the types (`Viewer` is `{ id }`; `@alxia/access` has its own of the same shape) |
+
+### Refusal codes
+
+A request that cannot be served gets a `TenancyError` whose `code` is
+`tenancy.errors.organization-required` (400), `tenancy.errors.unknown-organization`
+(404) or `tenancy.errors.slug-taken` (409). These codes keep their `tenancy.errors.`
+namespace on purpose: they are the keys an existing host's i18n catalogue already
+translates, and they match the `x-organization-id` header and the `perOrganization`
+name the host already speaks. Renaming them would break every translation for no gain.
+The boot errors (`tenancy.module-wiring`, `tenancy.unknown-migration`) are a different
+kind: a developer's, never shown to a user, so they use the kernel's boot shape
+(`tenancy.<reason>` and a message).
 
 Peers: `@alxia/modules`, `@nxgt/mongo`, `mongodb`, `typescript`.
 

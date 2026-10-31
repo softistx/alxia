@@ -1,6 +1,18 @@
-/** The catalogue cannot be built from the modules; the message names the module. */
+export type AccessCatalogueErrorCode =
+	| 'access.invalid-permission'
+	| 'access.unknown-role'
+	| 'access.undeclared-grant';
+
+/**
+ * The catalogue cannot be built from the modules; the message names the
+ * module. `code` is stable and namespaced `access.`. (A permission two modules
+ * declare is a `ModuleGraphError` of `@alxia/modules`.)
+ */
 export class AccessCatalogueError extends Error {
-	constructor(message: string) {
+	constructor(
+		readonly code: AccessCatalogueErrorCode,
+		message: string,
+	) {
 		super(message);
 		this.name = 'AccessCatalogueError';
 	}
