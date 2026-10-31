@@ -43,9 +43,15 @@ export const notifications = defineModule({
 | --- | --- |
 | `invalid-type` | an `emits` entry that is not `<module>.<entity>.<verb>` |
 | `duplicate-emit` | one type declared by two modules |
+| `foreign-type` | an `emits` entry whose first segment is not the declaring module's name |
 | `unknown-subscription` | a subscriber of a type no module emits |
 | `module-missing` | no `eventsModule` |
 | `missing-queue` | a module with subscribers and no `events.<module>` queue, once `queues` is given |
+
+One more code is thrown at run time, not at boot: `tenant-mismatch`, when an
+`_outbox` row or a job names a tenant other than the one it was found in. The
+row is refused and stays pending, which holds back that tenant's later events;
+see [troubleshooting](troubleshooting.md#tenant-mismatch).
 
 ## Register the kernel module
 
@@ -120,10 +126,16 @@ a new event, and only the committed run's stays.
 A subscriber receives the envelope and a context:
 
 ```ts
-import type { Subscriber } from '@alxia/events';
+import type { EventEnvelope, SubscriberContext } from '@alxia/events';
 
-export const onOverdue: Subscriber = async (event, context) => {
-	const { mongo } = tenancy.forModule(context, 'notifications');
+export const onOverdue = async (
+	event: EventEnvelope,
+	context: SubscriberContext<'notifications', Tenant, Core>,
+) => {
+	// Tenant and Core are the host's own wirings: its tenant and core collection
+	// types (what it passes to createTenantStore).
+	// Already narrowed to notifications' collections and its dependsOn ones.
+	const { mongo } = context;
 	await mongo.db.items.create({
 		kind: 'invoice-overdue',
 		invoiceId: event.aggregate.id,
@@ -131,8 +143,10 @@ export const onOverdue: Subscriber = async (event, context) => {
 };
 ```
 
-`context` has `mongo` (the tenant's database, **in the transaction** that also
-writes the `_inbox` row), `core`, `tenant` and `module`. Write database
+`context` is the module's scope (`mongo` on the tenant's database, **in the
+transaction** that also writes the `_inbox` row, and `core`, both narrowed to
+the module's collections and those of its `dependsOn`), plus `tenant` (the one
+being delivered to) and `module`. Write database
 effects through `context.mongo`: if the handler throws, the effects and the
 inbox row roll back together and the retry starts clean; if the event is
 delivered twice, the second delivery finds the row and does nothing.

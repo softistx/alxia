@@ -89,6 +89,29 @@ export type ModuleCoreMongo<
 	? Readonly<PickedBy<ViewOf<List, Name>[], 'coreCollections'>>
 	: Open;
 
+// What a `Mongo<C>` handle offers beyond `db` and `transaction` that would
+// let a module out of its narrowing: `databases` and `clients` give the whole
+// wiring, `as` and `withSession` answer the unnarrowed handle. The first two
+// are left out; the others are re-declared to answer the narrowed one.
+type EscapingKeys =
+	| 'db'
+	| 'transaction'
+	| 'as'
+	| 'withSession'
+	| 'databases'
+	| 'clients';
+
+// `as` and `withSession` keep the parameters the host's handle gives them
+// and answer `Self`; `never` when the handle has none.
+type RebindAs<Handle, Self> = Handle extends { as(actor: infer Actor): unknown }
+	? (actor: Actor) => Self
+	: never;
+type RebindSession<Handle, Self> = Handle extends {
+	withSession(session: infer Session): unknown;
+}
+	? (session: Session) => Self
+	: never;
+
 // A host's handle (`db` keyed by collection name, and a `transaction`)
 // narrowed to `ModuleMongo<Name>`; a module typed against it fails typecheck
 // on any other collection.
@@ -99,7 +122,7 @@ export type ModuleHandle<
 		readonly transaction: (...args: never) => unknown;
 	},
 	List extends readonly unknown[] = Registered,
-> = Omit<Handle, 'db' | 'transaction'> & {
+> = Omit<Handle, EscapingKeys> & {
 	readonly db: IsRegistered extends true
 		? Pick<
 				Handle['db'],
@@ -110,6 +133,8 @@ export type ModuleHandle<
 		fn: (tx: ModuleHandle<Name, Handle, List>) => Promise<T>,
 		options?: Parameters<Handle['transaction']>[1],
 	): Promise<T>;
+	readonly as: RebindAs<Handle, ModuleHandle<Name, Handle, List>>;
+	readonly withSession: RebindSession<Handle, ModuleHandle<Name, Handle, List>>;
 };
 
 // A host's core handle narrowed to `ModuleCoreMongo<Name>` the same way.
@@ -120,7 +145,7 @@ export type ModuleCoreHandle<
 		readonly transaction: (...args: never) => unknown;
 	},
 	List extends readonly unknown[] = Registered,
-> = Omit<Handle, 'db' | 'transaction'> & {
+> = Omit<Handle, EscapingKeys> & {
 	readonly db: IsRegistered extends true
 		? Pick<
 				Handle['db'],
@@ -131,4 +156,9 @@ export type ModuleCoreHandle<
 		fn: (tx: ModuleCoreHandle<Name, Handle, List>) => Promise<T>,
 		options?: Parameters<Handle['transaction']>[1],
 	): Promise<T>;
+	readonly as: RebindAs<Handle, ModuleCoreHandle<Name, Handle, List>>;
+	readonly withSession: RebindSession<
+		Handle,
+		ModuleCoreHandle<Name, Handle, List>
+	>;
 };

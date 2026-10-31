@@ -2,6 +2,8 @@ export type EventsErrorCode =
 	| 'invalid-type'
 	| 'undeclared-type'
 	| 'duplicate-emit'
+	| 'foreign-type'
+	| 'tenant-mismatch'
 	| 'unknown-subscription'
 	| 'module-missing'
 	| 'missing-queue'

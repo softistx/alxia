@@ -6,7 +6,8 @@
 - [`the payload of "x" is not JSON data`](#the-payload-of-x-is-not-json-data)
 - [`module "m" subscribes to "x", which no module in the registry emits`](#module-m-subscribes-to-x-which-no-module-in-the-registry-emits)
 - [`the registry lacks eventsModule`](#the-registry-lacks-eventsmodule)
-- [`invalid-type` and `duplicate-emit`](#invalid-type-and-duplicate-emit)
+- [`invalid-type`, `duplicate-emit` and `foreign-type`](#invalid-type-duplicate-emit-and-foreign-type)
+- [`tenant-mismatch`](#tenant-mismatch)
 - [`this needs the bound events.<module> queues`](#this-needs-the-bound-eventsmodule-queues)
 - [`module "m" has no subscriber for "x" in this process's registry`](#module-m-has-no-subscriber-for-x-in-this-processs-registry)
 - [`module "m" has subscribers but no queue`](#module-m-has-subscribers-but-no-queue)
@@ -65,9 +66,13 @@ owns it, in the registry the store and `createEvents` share.
 emitting module is not in the registry. Register it, or fix the key of
 `subscribers`.
 
-## `invalid-type` and `duplicate-emit`
+## `invalid-type`, `duplicate-emit` and `foreign-type`
 
-`EventsError`, at boot. `module "m" emits "x", which is not <module>.<entity>.<verb> in lower case`: rename the type (`shop.order.placed`). `event type "x" is declared by two modules`: a type has one owner; keep it in one module's `emits`.
+`EventsError`, at boot. `module "m" emits "x", which is not <module>.<entity>.<verb> in lower case`: rename the type (`shop.order.placed`). `event type "x" is declared by two modules`: a type has one owner; keep it in one module's `emits`. `foreign-type`: `module "a" emits "b.order.placed"`, whose first segment is not its own name; a module emits only the types it owns (`a.…`), so move the entry to `b`.
+
+## `tenant-mismatch`
+
+`EventsError`, at run time (at `drain`, in the relay's `onError`, or in a worker): an `_outbox` row or a job names a tenant other than the database or job it was found in. The row is refused and stays pending, so that tenant's later events wait behind it (rows are dispatched in `_id` order) until it is dealt with. Find how it got there (a copied database, a hand-written row), then delete or correct the row; the next tick resumes.
 
 ## `the registry lacks eventsModule`
 

@@ -1,3 +1,4 @@
+import type { Tenant, TenantStore } from '@alxia/tenancy';
 import { ConflictError } from '@nxgt/mongo';
 import type { EventEnvelope } from './envelope';
 import type { Subscription } from './registry';
@@ -8,13 +9,19 @@ export type Delivery = 'applied' | 'duplicate';
 /**
  * Runs one subscriber for one event, once: in one transaction it looks for the
  * `_inbox` row of (event, subscriber), writes it, and calls the handler with
- * the transaction's handle. A row already there makes the call a no-op, and a
+ * the transaction's handle narrowed to the subscriber's module
+ * (`store.forModule`), and `tenant` is the one delivered to, never the
+ * outbox row's. A row already there makes the call a no-op, and a
  * handler that throws rolls the row back with its effects, so a retry starts
  * clean. This is what turns at-least-once delivery into one effect.
  */
 export async function deliver(
+	store: Pick<
+		TenantStore<unknown, unknown, Tenant, unknown>,
+		'core' | 'forModule'
+	>,
 	mongo: EventsMongo,
-	core: unknown,
+	tenant: string,
 	event: EventEnvelope,
 	subscription: Subscription,
 ): Promise<Delivery> {
@@ -23,10 +30,14 @@ export async function deliver(
 			const key = { eventId: event.id, subscriber: subscription.id };
 			if (await tx.db._inbox.findFirst(key)) return 'duplicate';
 			await tx.db._inbox.create(key);
+			// The registry is erased at this layer, so the module and handle types are cast.
+			const scope = store.forModule(
+				{ mongo: tx as never, core: store.core },
+				subscription.module as never,
+			);
 			const context: SubscriberContext = {
-				mongo: tx as never,
-				core: core as never,
-				tenant: event.tenant,
+				...scope,
+				tenant,
 				module: subscription.module,
 			};
 			await subscription.handler(event, context);

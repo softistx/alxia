@@ -95,6 +95,19 @@ export const access = createAccess(modules, {
 });
 ```
 
+The permission arguments of every guard are typed `Permission`. A literal
+passes; a `string` variable does not until it is checked, or comes from an
+`as const` list:
+
+```ts
+import { isPermission, requirePermission } from '@alxia/access';
+
+if (isPermission(name)) await requirePermission(ctx, name);
+
+const needed = ['notes:read', 'notes:manage'] as const;
+await requirePermission(ctx, needed[0]);
+```
+
 ### Own data: `requireSelf`
 
 What belongs to one account is never opened by a grant:
