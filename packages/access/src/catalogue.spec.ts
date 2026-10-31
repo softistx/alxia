@@ -194,3 +194,43 @@ describe('a catalogue that cannot be built (boot errors)', () => {
 		);
 	});
 });
+
+describe('actions the host declares beyond read and manage', () => {
+	const orders = defineModule({
+		name: 'orders',
+		permissions: ['orders:read', 'orders:manage', 'orders:receive'],
+		defaultGrants: {
+			warehouse: ['orders:read', 'orders:receive'],
+			sales: ['orders:read', 'orders:manage'],
+		},
+	});
+	const options = {
+		roles,
+		all: 'admin',
+		actions: ['receive'],
+	} as const;
+
+	test('a declared action is catalogued, granted, and held by `all`', () => {
+		const access = createAccess([orders], options);
+		expect(access.permissions).toContain('orders:receive');
+		expect(access.roleCan('warehouse', 'orders:receive')).toBe(true);
+		expect(access.roleCan('sales', 'orders:receive')).toBe(false);
+		expect(access.roleCan('admin', 'orders:receive')).toBe(true);
+	});
+
+	test('an undeclared action is still refused, with the same code', () => {
+		expect(() => createAccess([orders], { roles, all: 'admin' })).toThrow(
+			expect.objectContaining({ code: 'access.invalid-permission' }),
+		);
+		const bad = defineModule({ name: 'bad', permissions: ['bad:ship'] });
+		expect(() => createAccess([bad], options)).toThrow(
+			expect.objectContaining({ code: 'access.invalid-permission' }),
+		);
+	});
+
+	test('an action in a wrong shape is refused at boot', () => {
+		expect(() =>
+			createAccess([orders], { roles, actions: ['Receive'] }),
+		).toThrow(expect.objectContaining({ code: 'access.invalid-permission' }));
+	});
+});

@@ -16,7 +16,7 @@ bun add -d typescript
 
 ## In 30 seconds
 
-Modules declare what they guard (`<area>:read` or `<area>:manage`) and which
+Modules declare what they guard (`<area>:read` or `<area>:manage`, or an action the host declares) and which
 of the host's roles hold it by default. The host supplies its roles.
 
 ```ts
@@ -68,7 +68,7 @@ await requireSelf(ctx, userId); // the viewer is that account, else 403
 | `requireSelf(ctx, userId, { or })` | the account itself, or a holder of `or` |
 | `can(ctx, p)` | never throws for a missing viewer: `false`, for a flag or a field |
 
-Every `p` is a `Permission` (`<area>:read` or `<area>:manage`), not a `string`: a plain `string` variable needs an `isPermission` check, or an `as const` list.
+Every `p` is a `Permission` (`<area>:<action>`, such as `notes:read`), not a `string`: a plain `string` variable needs an `isPermission` check, or an `as const` list.
 
 A module's two guards: `permissionsReadWrite('notes:read', 'notes:manage')`
 returns `{ reading, writing }`, `membersReadPermissionWrites('notes:manage')` lets any member read, and `scopeOf({ read, write }, select)` builds
@@ -108,9 +108,9 @@ modules declare is `@alxia/modules`' `ModuleGraphError`
 
 | Export | What it does |
 | --- | --- |
-| `createAccess(modules, options)`, `Access`, `AccessOptions` | the role catalogue built from the registry: `roles`, `permissions`, `matrix`, `roleCan`, `permissionsOf`, `holds` |
+| `createAccess(modules, { roles, all?, actions?, roleOf? })`, `Access`, `AccessOptions` | the role catalogue built from the registry: `roles`, `permissions`, `matrix`, `roleCan`, `permissionsOf`, `holds` |
 | `Viewer` | `{ id }`, the account a request is made by (`@alxia/tenancy` has its own of the same shape) |
-| `Permission`, `isPermission(value)` | the `<area>:read` or `<area>:manage` type, and its check |
+| `Permission`, `isPermission(value, actions?)` | the `<area>:<action>` type, and its check (`read` and `manage`, plus the `actions` given) |
 | `requireViewer`, `requireMember`, `requirePermission`, `requireAnyPermission`, `requireSelf`, `can`, `GuardContext` | the request guards, and the context they read (`viewer`, `access`, `scope`) |
 | `permissionsReadWrite(read, write, select?)`, `membersReadPermissionWrites(write, select?)`, `scopeOf({ read, write }, select?)` | a module's two guards, `{ reading, writing }` |
 | `refusalMapper(map)`, `withRefusals(map, fn)`, `refusalOf(error)`, `Refusal` | map refusals to the host's error type |

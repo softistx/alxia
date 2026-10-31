@@ -2,11 +2,13 @@
 
 ## Permissions
 
-A permission is `<area>:read` or `<area>:manage`: the area in lower case,
-digits and `_`, then `read` (see) or `manage` (change). The `Permission` type
+A permission is `<area>:read` or `<area>:manage`, or an action the host
+declares: the area in lower case, digits and `_`, then `read` (see) or
+`manage` (change). The `Permission` type
 is that shape, and `isPermission(value)` checks a string. A module declares
 the ones it guards in `permissions` and says which roles hold them by default
-in `defaultGrants`:
+in `defaultGrants`. `read` and `manage` are always allowed; for a narrower
+action the host lists it in `createAccess`' `actions` (see below):
 
 ```ts
 import { defineModule } from '@alxia/modules';
@@ -52,6 +54,32 @@ boot: it throws an `AccessCatalogueError` for a permission that is badly
 spelled or declared twice, a grant to a role the host did not supply and a
 grant of a permission the module does not declare. See
 [troubleshooting](troubleshooting.md).
+
+## Actions beyond read and manage
+
+A warehouse role may receive goods on an order without editing it. The host
+declares the action, a module lists `orders:receive` in its `permissions` and
+grants it like any other, and `all` holds it too:
+
+```ts
+const orders = defineModule({
+	name: 'orders',
+	permissions: ['orders:read', 'orders:manage', 'orders:receive'],
+	defaultGrants: { warehouse: ['orders:read', 'orders:receive'] },
+});
+
+const access = createAccess([orders], {
+	roles: ['admin', 'warehouse'],
+	all: 'admin',
+	actions: ['receive'],
+});
+
+await requirePermission(ctx, 'orders:receive');
+```
+
+An action is lower case, digits and `_`. One that is not in `actions` is still
+an `access.invalid-permission` boot error. The `Permission` type accepts any
+`<area>:<action>`; the boot check is what refuses an undeclared action.
 
 ## Guarding an operation
 

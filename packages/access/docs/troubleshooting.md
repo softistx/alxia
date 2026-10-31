@@ -17,9 +17,11 @@ for a permission two modules declare.
 
 ## `declares "x", which is not <area>:read or <area>:manage`
 
-A permission has the shape `<area>:read` or `<area>:manage`: lower case,
+A permission has the shape `<area>:read` or `<area>:manage`, or an action the
+host declares: lower case,
 digits and `_` in the area. `sales:write`, `Sales:read` and `sales` are
-refused. Rename it:
+refused. A narrower action (`orders:receive`) is allowed once the host lists
+it in `createAccess`' `actions: ['receive']`. Otherwise rename it:
 
 ```ts
 import { defineModule } from '@alxia/modules';
@@ -72,6 +74,7 @@ signed-in account in the context before the guard runs. `can` answers
 
 ## `Argument of type 'string' is not assignable to parameter of type 'Permission'`
 
-The guards take a `Permission` (`<area>:read` or `<area>:manage`), not any
+The guards take a `Permission` (`<area>:read` or `<area>:manage`, or an action
+the host declares), not any
 `string`. Check the variable with `isPermission(name)` before the call, or
 declare the list `as const` so its members keep their literal types.

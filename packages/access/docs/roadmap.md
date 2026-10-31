@@ -26,4 +26,5 @@ Nothing scheduled yet.
 
 ## Shipped
 
-Nothing yet.
+- **Actions beyond read and manage.** The host lists extra actions
+  (`actions: ['receive']`) and modules declare `orders:receive`.
