@@ -4,6 +4,7 @@ export {
 	type TenantDatabasesOptions,
 } from './databases';
 export {
+	ModuleWiringError,
 	organizationRequired,
 	slugTaken,
 	TenancyError,
@@ -12,6 +13,7 @@ export {
 	unknownOrganization,
 } from './errors';
 export { dbOf } from './migrate';
+export type { ModuleScope, ModuleSource } from './modules';
 export {
 	type DatabaseNaming,
 	isTenantId,

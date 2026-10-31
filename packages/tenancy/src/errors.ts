@@ -35,3 +35,15 @@ export const unknownOrganization = () =>
 
 export const slugTaken = (slug: string) =>
 	new TenancyError('tenancy.errors.slug-taken', 409, { slug });
+
+/**
+ * A module the store cannot hand out: the name is not in its `modules`, or a
+ * collection the module (or a `dependsOn`) declares is missing from the wiring
+ * of the database it belongs to.
+ */
+export class ModuleWiringError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'ModuleWiringError';
+	}
+}

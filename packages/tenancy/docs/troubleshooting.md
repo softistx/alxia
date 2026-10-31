@@ -8,6 +8,10 @@
 - [`the tenant cache holds at least one entry`](#the-tenant-cache-holds-at-least-one-entry)
 - [`rollback: "x" is in no migration list`](#rollback-x-is-in-no-migration-list)
 - [`migration failed in <database>`](#migration-failed-in-database)
+- [`module "x" is not registered`](#module-x-is-not-registered)
+- [`collection "y" of module "x" is not wired in the tenant database`](#collection-y-of-module-x-is-not-wired-in-the-tenant-database)
+- [`core collection "y" of module "x" is not wired in the core database`](#core-collection-y-of-module-x-is-not-wired-in-the-core-database)
+- [`collection "y" is a tenant collection of "x" and a core collection of "z"`](#collection-y-is-a-tenant-collection-of-x-and-a-core-collection-of-z)
 - [An organisation stays `provisioning`](#an-organisation-stays-provisioning)
 - [A request with a valid header is a 404](#a-request-with-a-valid-header-is-a-404)
 
@@ -74,3 +78,40 @@ Check, in order: the organisation is `active`; the header is the one the store
 reads (`store.header`); `membership` returns something other than `null` or
 `false` for this account; and the registry's `findById` / `findBySlug` do not
 hide it (soft delete).
+
+## `module "x" is not registered`
+
+A `ModuleWiringError` from `forModule`. The store was built without `modules`,
+or without that module. Pass the registry, resolved:
+
+```ts
+perOrganization({ /* … */ modules: resolveModules(registered) });
+```
+
+## `collection "y" of module "x" is not wired in the tenant database`
+
+A `ModuleWiringError` from `forModule`. The module, or one of its `dependsOn`,
+declares a collection the tenant database's `defineMongo` wiring lacks. Wire
+the registry's:
+
+```ts
+defineMongo({ client, database, collections: collectionsOf(modules) });
+```
+
+On a `single` store with no separate core, wire both lists into the one
+database.
+
+## `core collection "y" of module "x" is not wired in the core database`
+
+A `ModuleWiringError` from `forModule`. A `coreCollections` entry is missing
+from the core database's wiring:
+
+```ts
+defineMongo({ client, database: 'app_core', collections: coreCollectionsOf(modules) });
+```
+
+## `collection "y" is a tenant collection of "x" and a core collection of "z"`
+
+A `ModuleWiringError` when the store is built. A name is in one module's
+`collections` and another's `coreCollections`; on a `single` store both would
+be one collection. Rename one, or declare it on one side only.

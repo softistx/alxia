@@ -9,7 +9,7 @@ gets is that organisation's database, so a resolver never builds a database
 name and a query cannot reach another organisation's data.
 
 ```sh
-bun add @alxia/tenancy @nxgt/mongo mongodb
+bun add @alxia/tenancy @alxia/modules @nxgt/mongo mongodb
 bun add -d typescript
 ```
 
@@ -61,6 +61,35 @@ import { lazyScope } from '@alxia/tenancy';
 const getScope = lazyScope(tenancy, request, viewer);
 const { mongo } = await getScope(); // the same promise every time
 ```
+
+## A module's handles
+
+`@alxia/modules` is a required peer. The `modules` option is optional:
+without it, `forModule` throws `module "x" is not registered`.
+
+Give the store your registry and plugin code touches only the handles of its
+module, typed through `Register`; it never names a database:
+
+```ts
+import { resolveModules } from '@alxia/modules';
+
+const modules = resolveModules(registered);
+const tenancy = perOrganization({ /* … */ modules });
+
+const scope = await tenancy.scope(request, viewer);
+const { mongo, core } = tenancy.forModule(scope, 'notes');
+mongo.db.notes; // the module's tenant collections and its `dependsOn` ones
+core.db.accounts; // its `coreCollections`, on the core database
+```
+
+`collections` land in the tenant's database, `coreCollections` in the core
+one; on the `single` store both are the same database. `forModule` also takes
+`{ mongo, core: tenancy.core }` for the tenant `eachTenant` hands you. It throws
+a `ModuleWiringError` for a module the registry lacks, or a collection your
+`defineMongo` wiring does not hold (wire it with `collectionsOf(modules)` and
+`coreCollectionsOf(modules)`). Provision, `sync` and `migrate` take the
+migrations from the registry (`migrationsOf`, `coreMigrationsOf`), before
+those of `migrations` and `coreMigrations`.
 
 ## The header, id or slug
 
@@ -133,18 +162,19 @@ database.reset(); // between tests
 | --- | --- |
 | `perOrganization(options)` | the core database plus one database per organisation |
 | `single(options)` | one database, one fixed tenant |
-| `TenantStore` | the contract both answer: `resolve`, `tenantOf`, `databaseOf`, `scope`, `eachTenant`, `provision`, `prepare`, `sync`, `migrate`, `close` |
+| `TenantStore` | the contract both answer: `resolve`, `tenantOf`, `databaseOf`, `scope`, `forModule`, `eachTenant`, `provision`, `prepare`, `sync`, `migrate`, `close` |
 | `lazyScope(store, request, viewer)` | a request's scope, resolved once, on first use |
 | `viewerMemberships(membership, viewer)` | the viewer's membership in any tenant, read once per request |
 | `slotNaming(prefix, slots)` | `<prefix>_slot<n>` database names for tests |
 | `createTenantDatabases(options)`, `isTenantId`, `dbOf` | the bounded cache of tenant `Mongo`s, the check on ids that reach a database name, the driver's `Db` under a `Mongo` |
-| `TenancyError`, `UnknownMigrationError` | the refusals |
+| `ModuleScope`, `ModuleSource` | what `forModule` returns (`mongo`, `core`) and takes: a scope, or `{ mongo, core: store.core }` for the tenant `eachTenant` visits |
+| `TenancyError`, `UnknownMigrationError`, `ModuleWiringError` | the refusals |
 | `organizationRequired(header)`, `unknownOrganization()`, `slugTaken(slug)` | the `TenancyError`s the stores throw, for a host's own store or spec to throw the same ones |
 | `DEFAULT_HEADER` | `'x-organization-id'`, the header when `header` is not given |
 | `noMembers` | a `Membership` that admits nobody, for a spec or a locked-down host |
 | `Tenant`, `TenantRegistry`, `Membership`, `TenantScope`, `Viewer`, `Resolution`, `MigrateMode`, `MigrationOutcome` | the types |
 
-Peers: `@nxgt/mongo`, `mongodb`, `typescript`.
+Peers: `@alxia/modules`, `@nxgt/mongo`, `mongodb`, `typescript`.
 
 ## Documentation
 

@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, test } from 'bun:test';
 import {
 	dbOf,
 	lazyScope,
+	ModuleWiringError,
 	type Tenant,
 	type TenantStore,
 	UnknownMigrationError,
@@ -19,6 +20,8 @@ export interface Harness {
 	requestFor(tenant: Tenant): Request;
 	/** The two marker migrations the store was built with, in order (tenant list). */
 	migrationIds: [string, string];
+	/** Whether the core and the tenant's collections share one database (the `single` store). */
+	sharedDatabase: boolean;
 }
 
 /**
@@ -76,6 +79,45 @@ export function describeTenantStore(
 			expect((await notes.create({ text: 'hello' })).createdBy).toBe(ACCOUNT_A);
 			expect(typeof dbOf(scope.core).databaseName).toBe('string');
 			expect(scope.core.actor as unknown).toBeUndefined();
+		});
+
+		test('forModule: collections land in the tenant or the core database, as the module declares', async () => {
+			const scope = await h.store.scope(h.requestFor(tenant), {
+				id: ACCOUNT_A,
+			});
+			const notes = h.store.forModule(scope, 'notes');
+			const own = dbOf(scope.mongo).databaseName;
+			const core = dbOf(scope.core).databaseName;
+			expect(dbOf(notes.mongo as never).databaseName).toBe(own);
+			expect(dbOf(notes.core as never).databaseName).toBe(core);
+			expect(own === core).toBe(h.sharedDatabase);
+			// The tenant collection is the tenant's; the core one is the core's.
+			const db = notes.mongo.db as unknown as Notes;
+			await db.notes.create({ text: 'from a module' });
+			const written = await dbOf(scope.mongo)
+				.collection('notes')
+				.countDocuments({ text: 'from a module' });
+			expect(written).toBe(1);
+			expect(
+				(notes.core.db as unknown as { organizations: unknown }).organizations,
+			).toBeDefined();
+			if (!h.sharedDatabase) {
+				expect(
+					await dbOf(scope.core).collection('notes').countDocuments(),
+				).toBe(0);
+			}
+			// A dependent module reaches its own collection and its dependency's.
+			const tags = h.store.forModule(scope, 'tags');
+			const reach = tags.mongo.db as unknown as Record<string, unknown>;
+			expect(reach['tags']).toBeDefined();
+			expect(reach['notes']).toBeDefined();
+			// eachTenant callers hand over what they visit.
+			await h.store.eachTenant(async (_visited, mongo) => {
+				h.store.forModule({ mongo, core: h.store.core }, 'notes');
+			});
+			expect(() => h.store.forModule(scope, 'nope' as never)).toThrow(
+				ModuleWiringError,
+			);
 		});
 
 		test('lazyScope reads once and keeps the answer', async () => {
@@ -140,6 +182,12 @@ export function describeTenantStore(
 			const done = await h.store.migrate({ kind: 'apply', dryRun: false });
 			expect(done.some((o) => o.ids.includes(second))).toBe(true);
 			expect(await markers()).toBe(2);
+
+			// The registry's core migration ran on the core database, once (on the
+			// single store the core is the tenant database).
+			expect(
+				await dbOf(h.store.core).collection('core_markers').countDocuments(),
+			).toBe(1);
 
 			const status = await h.store.migrate({ kind: 'status' });
 			expect(

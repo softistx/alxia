@@ -1,5 +1,7 @@
+import type { Module, ModuleName } from '@alxia/modules';
 import type { Mongo } from '@nxgt/mongo';
 import type { Migration, migrationStatus } from '@nxgt/mongo/migrations';
+import type { ModuleScope, ModuleSource } from './modules';
 
 export type TenantStatus = 'provisioning' | 'active' | 'archived';
 
@@ -107,6 +109,18 @@ export interface TenantStore<C, K, T extends Tenant, M> {
 		request: Request,
 		viewer: Viewer | null,
 	): Promise<TenantScope<C, K, T, M>>;
+	/** The registry the store was given (`modules`), in dependency order. */
+	readonly modules: readonly Module[];
+	/**
+	 * A module's handles from a scope (or a tenant visited by `eachTenant`):
+	 * its own collections and its `dependsOn` ones, typed through `Register`.
+	 * Throws a `ModuleWiringError` for a module the registry lacks or a
+	 * collection the databases are not wired with.
+	 */
+	forModule<Name extends ModuleName>(
+		source: ModuleSource<C, K>,
+		name: Name,
+	): ModuleScope<Name, C, K>;
 	/** Runs `fn` on each tenant in turn and returns the results. */
 	eachTenant<R>(
 		fn: (tenant: T, mongo: Mongo<C>) => Promise<R>,
@@ -125,6 +139,12 @@ export interface TenantStore<C, K, T extends Tenant, M> {
 }
 
 export interface MigrationLists {
+	/**
+	 * The registry: indexes come from its collections (the databases' wiring),
+	 * migrations from `migrationsOf` and `coreMigrationsOf`, run before the
+	 * explicit lists below.
+	 */
+	modules?: readonly Module[];
 	/** Applied to every tenant database. */
 	migrations?: Migration[];
 	/** Applied to the core database. */
