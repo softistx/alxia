@@ -274,10 +274,9 @@ What to know:
   does not: the by-name store counts under `shop:api:<limit>/<windowMs>:<key>`,
   the wired one under `shop:api:<key>`, so counts restart:
   [troubleshooting](../troubleshooting.md#counts-restart-after-moving-a-rate-limit-to-the-wired-form).
-- **Both forms stay**, on `@nxgt/redis` 0.7 and later: the peer starts at 0.7
-  (`^0.7.0 || ^0.8.0 || ^0.9.0`), because the
-  bound limit's `definition`, which the single-argument `redisStore` reads its
-  rate from, is 0.7's.
+- **Both forms stay**, on `@nxgt/redis` 0.9 and later: the peer is `^0.9.0` (it started at 0.7).
+  The bound limit's `definition`, which the single-argument `redisStore`
+  reads its rate from, is 0.7's.
 
 ## Naming keys
 
