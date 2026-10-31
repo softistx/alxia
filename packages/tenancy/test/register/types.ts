@@ -50,3 +50,13 @@ scope.core.db.other;
 // @ts-expect-error not a registered module
 store.forModule(source, 'billing');
 expectTypeOf(store.forModule(source, 'audit').mongo.db).toHaveProperty('audit');
+
+// The handle a module gets does not let it out of its narrowing.
+// @ts-expect-error as answers the narrowed handle
+scope.mongo.as({} as never).db.audit;
+// @ts-expect-error withSession answers the narrowed handle
+scope.mongo.withSession(undefined).db.audit;
+// @ts-expect-error databases is not handed to a module
+scope.mongo.databases;
+// @ts-expect-error clients is not handed to a module
+scope.mongo.clients;

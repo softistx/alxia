@@ -50,6 +50,18 @@ describe('boot checks', () => {
 		).toBe('duplicate-emit');
 	});
 
+	test("a module emitting a type that is not its own name's is refused", async () => {
+		const modules = [
+			eventsModule,
+			defineModule({ name: 'a', emits: ['b.order.placed'] }),
+			defineModule({ name: 'b' }),
+		];
+		const error = refusal(() => createEvents({ store: { modules } as never }));
+		expect(error.code).toBe('foreign-type');
+		expect(error.message).toContain('"a"');
+		expect(error.message).toContain('b.order.placed');
+	});
+
 	test('a registry without eventsModule is refused', async () => {
 		const modules = [defineModule({ name: 'a', emits: ['a.x.y'] })];
 		expect(

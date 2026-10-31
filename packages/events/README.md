@@ -31,8 +31,9 @@ export const billing = defineModule({
 	name: 'billing',
 	subscribers: {
 		'shop.order.placed': async (event, context) => {
-			// `context.mongo` is in the transaction that records the inbox row.
-			const { mongo } = tenancy.forModule(context, 'billing');
+			// `context.mongo` is in the transaction that records the inbox row,
+			// and narrowed to billing's collections and those of its dependsOn.
+			const { mongo } = context;
 			await mongo.db.invoices.create({ orderId: event.aggregate.id });
 		},
 	},
@@ -112,7 +113,7 @@ await events.drain(scope.tenant.id); // omit the tenant to drain every tenant
 | `events.work(options?)` | one `@nxgt/redis` worker per subscribing module's queue |
 | `events.deadLetters({ limit? })` | the jobs that used all their attempts |
 | `eventsQueue(module, options?)`, `queueName(module)` | the definition of `events.<module>` |
-| `deliver(mongo, core, event, subscription)` | one subscriber, once: inbox row plus handler in a transaction |
+| `deliver(store, mongo, tenant, event, subscription)` | one subscriber, once: inbox row plus handler in a transaction, handed its module's narrowed scope |
 | `emittedTypes(modules)`, `subscriptionsOf(modules)` | the registry readers behind the boot checks |
 | `outbox`, `inbox`, `OUTBOX_TTL`, `INBOX_TTL` | the collection definitions and TTLs |
 | `EventsError` | the refusals, with a stable `code` |

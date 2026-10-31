@@ -1,4 +1,5 @@
 import { type GuardContext, requireMember, requirePermission } from './guards';
+import type { Permission } from './permission';
 
 type Held = { member: unknown };
 
@@ -26,8 +27,8 @@ export function scopeOf<C extends { viewer: unknown }, S extends Held, T = S>(
  * are permissions a module declares (`sales:read`, `sales:manage`).
  */
 export function permissionsReadWrite<S extends Held, T = S>(
-	read: string,
-	write: string,
+	read: Permission,
+	write: Permission,
 	select?: (scope: S) => T,
 ) {
 	return scopeOf<GuardContext<S>, S, T>(
@@ -41,7 +42,7 @@ export function permissionsReadWrite<S extends Held, T = S>(
 
 /** Guards for a module any member may read, and a permission writes. */
 export function membersReadPermissionWrites<S extends Held, T = S>(
-	write: string,
+	write: Permission,
 	select?: (scope: S) => T,
 ) {
 	return scopeOf<GuardContext<S>, S, T>(

@@ -17,6 +17,10 @@ import {
 	requireSelf,
 	requireViewer,
 } from './guards';
+import {
+	membersReadPermissionWrites,
+	permissionsReadWrite,
+} from './scope-guards';
 
 const sampleModule = defineModule({
 	name: 'sample',
@@ -209,6 +213,27 @@ describe('requireSelf', () => {
 		).toMatchObject({
 			code: 'auth.errors.forbidden',
 			params: { permission: 'members:manage' },
+		});
+	});
+});
+
+describe('guards take a permission, not any string', () => {
+	test('a string that is not <area>:read|manage does not compile', () => {
+		const guard = (fn: () => unknown) => fn;
+		const { ctx } = context({ access, tenant: T, held: held('sales') });
+		guard(() => {
+			// @ts-expect-error not a permission
+			can(ctx, 'sample');
+			// @ts-expect-error not a permission
+			requirePermission(ctx, 'sample:write');
+			// @ts-expect-error not a permission
+			requireAnyPermission(ctx, ['sample:read', 'sample']);
+			// @ts-expect-error not a permission
+			requireSelf(ctx, ACCOUNT_A, { or: 'sample' });
+			// @ts-expect-error not a permission
+			permissionsReadWrite('sample', 'sample:manage');
+			// @ts-expect-error not a permission
+			membersReadPermissionWrites('sample');
 		});
 	});
 });

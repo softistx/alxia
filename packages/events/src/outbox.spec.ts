@@ -10,7 +10,13 @@ import {
 	soleTenant,
 	type TestMongo,
 } from '../test/harness';
-import { createEvents, type EventsError, type Subscriber } from '.';
+import {
+	createEvents,
+	deliver,
+	type EventsError,
+	type Subscriber,
+	subscriptionsOf,
+} from '.';
 
 const first = <T>(rows: T[]): T => rows[0] as T;
 
@@ -229,7 +235,6 @@ describe('tenants', () => {
 
 describe('inbox', () => {
 	test('a duplicate delivery of the same event is a no-op', async () => {
-		const { deliver, subscriptionsOf } = await import('.');
 		let calls = 0;
 		const handler: Subscriber = async () => {
 			calls += 1;
@@ -254,12 +259,96 @@ describe('inbox', () => {
 			'shop.order.placed',
 		)?.[0] as never;
 		const results = await Promise.all([
-			deliver(mongo, store.core, event, subscription),
-			deliver(mongo, store.core, event, subscription),
-			deliver(mongo, store.core, event, subscription),
+			deliver(store, mongo, 'only', event, subscription),
+			deliver(store, mongo, 'only', event, subscription),
+			deliver(store, mongo, 'only', event, subscription),
 		]);
 		expect(results.filter((r) => r === 'applied')).toHaveLength(1);
 		expect(calls).toBe(1);
 		expect(await mongo.db._inbox.raw.countDocuments({})).toBe(1);
+	});
+});
+
+describe('failure paths', () => {
+	test('a subscriber that emits what it subscribes to makes drain diverge', async () => {
+		let events: ReturnType<typeof createEvents> | undefined;
+		const handler: Subscriber = async (_event, context) => {
+			await events?.emit(
+				{ tenant: { id: context.tenant }, mongo: handleOf(context) },
+				{
+					type: 'shop.order.placed',
+					aggregate: { type: 'order', id: 'again' },
+					payload: {},
+				},
+			);
+		};
+		const store = await openSingle(
+			registry({ 'shop.order.placed': handler }).modules,
+		);
+		events = createEvents({ store });
+		const { tenant, mongo } = await soleTenant(store);
+		await place(events, tenant, mongo, 'a');
+		await expect(events.drain('only')).rejects.toMatchObject({
+			code: 'drain-diverged',
+		});
+	});
+
+	test('a row of another tenant in the scanned outbox is refused and stays pending', async () => {
+		let calls = 0;
+		const store = await openSingle(
+			registry({
+				'shop.order.placed': () => {
+					calls += 1;
+				},
+			}).modules,
+		);
+		const events = createEvents({ store });
+		const { tenant, mongo } = await soleTenant(store);
+		await place(events, tenant, mongo, 'a');
+		await mongo.db._outbox.raw.updateMany(
+			{},
+			{ $set: { tenant: 'elsewhere' } },
+		);
+		await expect(events.drain('only')).rejects.toMatchObject({
+			code: 'tenant-mismatch',
+		});
+		expect(calls).toBe(0);
+		expect(
+			await mongo.db._outbox.raw.countDocuments({ dispatchedAt: null }),
+		).toBe(1);
+	});
+
+	test('the context names the tenant delivered to, not the one the event carries', async () => {
+		const seen: string[] = [];
+		const { modules } = registry({
+			'shop.order.placed': (_event, context) => {
+				seen.push(context.tenant);
+			},
+		});
+		const store = await openSingle(modules);
+		const events = createEvents({ store });
+		const { tenant, mongo } = await soleTenant(store);
+		await place(events, tenant, mongo, 'a');
+		const row = first(await mongo.db._outbox.raw.find({}).toArray());
+		const subscription = subscriptionsOf(modules).get(
+			'shop.order.placed',
+		)?.[0] as never;
+		await deliver(
+			store,
+			mongo,
+			'delivering',
+			{
+				id: row._id.toHexString(),
+				type: row.type,
+				version: 1,
+				tenant: 'carried',
+				occurredAt: row.occurredAt,
+				actor: null,
+				aggregate: row.aggregate,
+				payload: row.payload,
+			},
+			subscription,
+		);
+		expect(seen).toEqual(['delivering']);
 	});
 });

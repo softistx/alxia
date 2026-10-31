@@ -19,6 +19,7 @@ import {
 	type TestMongo,
 } from '../test/harness';
 import { createEvents, type EventsQueueOptions, eventsQueue } from '.';
+import { toWire } from './envelope';
 
 // These specs need Redis: `$REDIS_URL` (CI's service container), else a
 // `redis-server` on PATH started on a free port. With neither they fail.
@@ -263,5 +264,114 @@ describe('relay', () => {
 		);
 		await workers.stop();
 		expect(s.applied).toHaveLength(3);
+	});
+
+	test('one tenant whose enqueue fails is reported, and the other is still relayed', async () => {
+		const s = await setup();
+		const { store, tenants } = await openOrganizations(s.modules);
+		const [a, b] = tenants as [(typeof tenants)[0], (typeof tenants)[0]];
+		const queues = {
+			[s.billing]: {
+				...s.queue,
+				add: (data: { tenant: string }, options: never) => {
+					if (data.tenant === a.id) throw new Error('queue refused');
+					return s.queue.add(data as never, options);
+				},
+			},
+		};
+		const events = createEvents({ store, queues: queues as never });
+		await place(events, a, await databaseOf(store, a.id), 'a1');
+		await place(events, b, await databaseOf(store, b.id), 'b1');
+
+		const errors: unknown[] = [];
+		const relay = events.relay({
+			redis: s.client,
+			lockKey: s.lockKey,
+			onError: (error) => errors.push(error),
+		});
+		expect(await relay.tick()).toEqual({ leader: true, dispatched: 1 });
+		expect(errors).toHaveLength(1);
+		expect((errors[0] as Error).message).toBe('queue refused');
+		const jobs = await s.queue.list('waiting');
+		expect(jobs.map((job) => job.data?.tenant)).toEqual([b.id]);
+		const dbA = await databaseOf(store, a.id);
+		expect(
+			await dbA.db._outbox.raw.countDocuments({ dispatchedAt: null }),
+		).toBe(1);
+	});
+
+	test('a pass that outlives the leader lock still reports what it dispatched', async () => {
+		const s = await setup();
+		const store = await openSingle(s.modules);
+		const queues = {
+			[s.billing]: {
+				...s.queue,
+				add: async (data: never, options: never) => {
+					await Bun.sleep(300);
+					return s.queue.add(data, options);
+				},
+			},
+		};
+		const events = createEvents({ store, queues: queues as never });
+		const { tenant, mongo } = await soleTenant(store);
+		await place(events, tenant, mongo, 'a');
+		const relay = events.relay({
+			redis: s.client,
+			lockKey: s.lockKey,
+			lockTtl: 100,
+		});
+		expect(await relay.tick()).toEqual({ leader: true, dispatched: 1 });
+	});
+
+	test('a job for a type the module does not subscribe to fails as unknown-subscription', async () => {
+		const s = await setup({ attempts: 1 });
+		const store = await openSingle(s.modules);
+		const events = createEvents({ store, queues: s.queues });
+		await s.queue.add({
+			tenant: 'only',
+			module: s.billing,
+			event: toWire({
+				id: '0'.repeat(24),
+				type: 'shop.order.cancelled',
+				version: 1,
+				tenant: 'only',
+				occurredAt: new Date(),
+				actor: null,
+				aggregate: { type: 'order', id: '1' },
+				payload: {},
+			}),
+		});
+		const workers = events.work();
+		await until(async () => (await events.deadLetters()).length === 1);
+		await workers.stop();
+		const [letter] = await events.deadLetters();
+		expect(letter?.error?.message).toContain('has no subscriber for');
+	});
+
+	test('a job whose tenant differs from its event is refused, never delivered', async () => {
+		const s = await setup({ attempts: 1 });
+		const store = await openSingle(s.modules);
+		const events = createEvents({ store, queues: s.queues });
+		await s.queue.add({
+			tenant: 'only',
+			module: s.billing,
+			event: toWire({
+				id: '0'.repeat(24),
+				type: 'shop.order.placed',
+				version: 1,
+				tenant: 'other',
+				occurredAt: new Date(),
+				actor: null,
+				aggregate: { type: 'order', id: '1' },
+				payload: {},
+			}),
+		});
+		const workers = events.work();
+		await until(async () => (await events.deadLetters()).length === 1);
+		await workers.stop();
+		const [letter] = await events.deadLetters();
+		expect(letter?.error?.message).toContain('is for tenant');
+		const { mongo } = await soleTenant(store);
+		expect(await invoiceCount(mongo)).toBe(0);
 	});
 });

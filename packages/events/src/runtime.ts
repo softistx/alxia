@@ -12,7 +12,7 @@ import type { EventsMongo } from './types';
 
 /** What the bus's verbs share; data only. */
 export interface Runtime {
-	readonly store: TenantStore<any, any, Tenant, any>;
+	readonly store: TenantStore<unknown, unknown, Tenant, unknown>;
 	readonly subscriptions: ReadonlyMap<string, readonly Subscription[]>;
 	/** The modules that have subscribers. */
 	readonly subscribing: ReadonlySet<string>;
@@ -43,10 +43,10 @@ export async function drain(
 			);
 		}
 		const found = sum(
-			await rt.tenantsOf(tenant, (_id, mongo) => {
+			await rt.tenantsOf(tenant, (id, mongo) => {
 				const send: Send = (event, subscription) =>
-					deliver(mongo, rt.store.core, event, subscription);
-				return dispatchPending(mongo, rt.subscriptions, send, rt.batchSize);
+					deliver(rt.store, mongo, id, event, subscription);
+				return dispatchPending(mongo, id, rt.subscriptions, send, rt.batchSize);
 			}),
 		);
 		total += found;
@@ -71,6 +71,7 @@ export function relay(rt: Runtime, options: RelayOptions): Relay {
 				try {
 					return await dispatchPending(
 						mongo,
+						id,
 						rt.subscriptions,
 						send,
 						rt.batchSize,
@@ -100,8 +101,14 @@ export function work(rt: Runtime, options?: WorkOptions): EventWorkers {
 						`module "${module}" has no subscriber for "${event.type}" in this process's registry`,
 					);
 				}
+				if (event.tenant !== data.tenant) {
+					throw new EventsError(
+						'tenant-mismatch',
+						`job ${event.id} is for tenant "${data.tenant}" but carries an event of tenant "${event.tenant}"`,
+					);
+				}
 				const mongo = rt.handle(await rt.store.databaseOf(data.tenant));
-				await deliver(mongo, rt.store.core, event, subscription);
+				await deliver(rt.store, mongo, data.tenant, event, subscription);
 			}, options),
 		);
 	return {

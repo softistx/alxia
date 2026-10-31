@@ -71,3 +71,22 @@ declare const core: ModuleCoreHandle<'notes', CoreHandle>;
 core.db.accounts;
 // @ts-expect-error other is not a core collection of notes or base
 core.db.other;
+
+// A module cannot step out of its narrowing through the handle.
+interface Wide extends Handle {
+	as(actor: { id: string }): Wide;
+	withSession(session: { id: number } | undefined): Wide;
+	readonly databases: { main: 1 };
+	readonly clients: { main: 2 };
+}
+declare const wide: ModuleHandle<'notes', Wide>;
+// @ts-expect-error as answers the narrowed handle
+wide.as({ id: 'a' }).db.audit;
+// @ts-expect-error withSession answers the narrowed handle
+wide.withSession(undefined).db.audit;
+wide.as({ id: 'a' }).db.notes;
+wide.withSession(undefined).db.notes;
+// @ts-expect-error databases is not handed to a module
+wide.databases;
+// @ts-expect-error clients is not handed to a module
+wide.clients;

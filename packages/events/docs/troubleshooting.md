@@ -67,7 +67,9 @@ emitting module is not in the registry. Register it, or fix the key of
 
 ## `invalid-type` and `duplicate-emit`
 
-`EventsError`, at boot. `module "m" emits "x", which is not <module>.<entity>.<verb> in lower case`: rename the type (`shop.order.placed`). `event type "x" is declared by two modules`: a type has one owner; keep it in one module's `emits`.
+`EventsError`, at boot. `module "m" emits "x", which is not <module>.<entity>.<verb> in lower case`: rename the type (`shop.order.placed`). `event type "x" is declared by two modules`: a type has one owner; keep it in one module's `emits`. `foreign-type`: `module "a" emits "b.order.placed"`, whose first segment is not its own name; a module emits only the types it owns (`a.…`), so move the entry to `b`.
+
+`tenant-mismatch` (at `drain`, the relay's `onError`, or a worker): an `_outbox` row or a job names a tenant other than the database or job it was found in. The row stays pending and nothing is delivered; find how it got there (a copied database, a hand-written row).
 
 ## `the registry lacks eventsModule`
 

@@ -1,5 +1,6 @@
 import type { Access, Viewer } from './catalogue';
 import { forbidden, unauthenticated } from './errors';
+import type { Permission } from './permission';
 
 /**
  * What a guard reads: the request's viewer, the catalogue and the request's
@@ -27,7 +28,7 @@ export function requireViewer<V extends Viewer>(ctx: {
  */
 export async function can<S extends { member: unknown }>(
 	ctx: GuardContext<S>,
-	permission: string,
+	permission: Permission,
 ): Promise<boolean> {
 	if (!ctx.viewer) return false;
 	const scope = await ctx.scope();
@@ -60,7 +61,7 @@ export async function requireMember<S extends { member: unknown }>(
  */
 export async function requirePermission<S extends { member: unknown }>(
 	ctx: GuardContext<S>,
-	permission: string,
+	permission: Permission,
 ): Promise<S> {
 	const viewer = requireViewer(ctx);
 	const scope = await ctx.scope();
@@ -76,7 +77,7 @@ export async function requirePermission<S extends { member: unknown }>(
  */
 export async function requireAnyPermission<S extends { member: unknown }>(
 	ctx: GuardContext<S>,
-	permissions: readonly [string, ...string[]],
+	permissions: readonly [Permission, ...Permission[]],
 ): Promise<S> {
 	const viewer = requireViewer(ctx);
 	const scope = await ctx.scope();
@@ -96,7 +97,7 @@ export async function requireAnyPermission<S extends { member: unknown }>(
 export async function requireSelf<S extends { member: unknown }>(
 	ctx: Pick<GuardContext<S>, 'viewer'> & Partial<GuardContext<S>>,
 	userId: string,
-	options: { or?: string } = {},
+	options: { or?: Permission } = {},
 ): Promise<Viewer> {
 	const viewer = requireViewer(ctx);
 	if (viewer.id === userId) return viewer;

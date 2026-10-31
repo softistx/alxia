@@ -1,4 +1,6 @@
-import type { Mongo, TypedCollection } from '@nxgt/mongo';
+import type { ModuleName } from '@alxia/modules';
+import type { ModuleScope } from '@alxia/tenancy';
+import type { TypedCollection } from '@nxgt/mongo';
 import type { inbox, outbox } from './collections';
 import type { EventEnvelope } from './envelope';
 
@@ -25,17 +27,25 @@ export interface EmitSource {
 }
 
 /**
- * What a subscriber receives beside the event. `mongo` is in the transaction
- * that also records the `_inbox` row: write the effects through it, and a
- * redelivery cannot apply them twice. Anything not in the database (a mail, a
- * request) must be idempotent by itself, or be a queued job with its own id.
+ * What a subscriber receives beside the event: the scope of its own module
+ * (`ModuleScope`: its collections and those of its `dependsOn`, nothing else),
+ * through `Register`. `mongo` is in the transaction that also records the
+ * `_inbox` row: write the effects through it, and a redelivery cannot apply
+ * them twice. Anything not in the database (a mail, a request) must be
+ * idempotent by itself, or be a queued job with its own id.
+ *
+ * `C` and `K` are the host's tenant and core wirings (`Mongo<C>`); name them
+ * to type a handler: `context: SubscriberContext<'billing', Tenant, Core>`.
  */
-export interface SubscriberContext<C = any, K = any> {
-	readonly mongo: Mongo<C>;
-	readonly core: Mongo<K>;
+export interface SubscriberContext<
+	Name extends ModuleName = ModuleName,
+	C = unknown,
+	K = unknown,
+> extends ModuleScope<Name, C, K> {
+	/** The tenant being delivered to, not the one the outbox row names. */
 	readonly tenant: string;
 	/** The module the subscriber belongs to. */
-	readonly module: string;
+	readonly module: Name;
 }
 
 export type Subscriber = (

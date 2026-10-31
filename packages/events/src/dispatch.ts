@@ -1,4 +1,5 @@
 import type { EventEnvelope } from './envelope';
+import { EventsError } from './errors';
 import type { Subscription } from './registry';
 import type { EventsMongo } from './types';
 
@@ -39,6 +40,7 @@ const envelopeOf = (row: PendingRow): EventEnvelope => ({
  */
 export async function dispatchPending(
 	mongo: EventsMongo,
+	tenant: string,
 	subscriptions: ReadonlyMap<string, readonly Subscription[]>,
 	send: Send,
 	batchSize: number,
@@ -52,6 +54,14 @@ export async function dispatchPending(
 			.limit(batchSize)
 			.toArray()) as unknown as PendingRow[];
 		for (const row of rows) {
+			if (row.tenant !== tenant) {
+				// A row copied from another tenant's database, or written by hand: it
+				// would reach subscribers under a tenant it does not belong to.
+				throw new EventsError(
+					'tenant-mismatch',
+					`the outbox of tenant "${tenant}" holds event ${row._id.toHexString()} of tenant "${row.tenant}"`,
+				);
+			}
 			const event = envelopeOf(row);
 			for (const subscription of subscriptions.get(event.type) ?? []) {
 				await send(event, subscription);

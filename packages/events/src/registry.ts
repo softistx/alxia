@@ -33,6 +33,12 @@ export function emittedTypes(modules: readonly Module[]): Map<string, string> {
 					`event type "${type}" is declared by two modules ("${other}" and "${module.name}")`,
 				);
 			}
+			if (type.split('.')[0] !== module.name) {
+				throw new EventsError(
+					'foreign-type',
+					`module "${module.name}" emits "${type}", whose first segment is not its own name: a module emits only <module>.<entity>.<verb> of itself`,
+				);
+			}
 			owner.set(type, module.name);
 		}
 	}
