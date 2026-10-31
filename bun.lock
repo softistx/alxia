@@ -159,7 +159,7 @@
     },
     "packages/graphql": {
       "name": "@alxia/graphql",
-      "version": "0.13.0",
+      "version": "0.13.1",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@alxia/logger": "workspace:^",
