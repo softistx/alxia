@@ -12,7 +12,7 @@ import type { EventsMongo } from './types';
 
 /** What the bus's verbs share; data only. */
 export interface Runtime {
-	readonly store: TenantStore<unknown, any, Tenant, unknown>;
+	readonly store: TenantStore<unknown, unknown, Tenant, unknown>;
 	readonly subscriptions: ReadonlyMap<string, readonly Subscription[]>;
 	/** The modules that have subscribers. */
 	readonly subscribing: ReadonlySet<string>;
