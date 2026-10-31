@@ -1,5 +1,13 @@
 # @alxia/graphql
 
+## 0.13.0
+
+### Minor Changes
+
+- [#450](https://github.com/softistx/alxia/pull/450) [`1718958`](https://github.com/softistx/alxia/commit/1718958a0326dbd6dc0b43fa011cff6f2c9c2cd8) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Accept `graphql-yoga` 6 as a peer: the range is now `^5.16.0 || ^6.0.0`, and `@alxia/create` writes the same range. No change in the package's source. Both majors are verified in CI: the required job runs the specs on Yoga 6, the "Floor peers" job on Yoga 5.16 with the 3.x `@graphql-yoga/plugin-*`.
+  
+  Yoga 6 changes its `logging` option: a custom logger must be a `@graphql-hive/logger` `Logger`, no longer a bare `{ debug, info, warn, error }` object (`log.child is not a function`). See the troubleshooting page.
+
 ## 0.12.0
 
 ### Minor Changes
