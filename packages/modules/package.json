@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/modules",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "Modules for an application: a manifest per module, a registry resolved in dependency order, typed collection access limited to what a module owns or depends on, and a test that holds the module boundaries",
 	"license": "MIT",
 	"type": "module",
