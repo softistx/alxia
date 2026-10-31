@@ -64,6 +64,16 @@ describe('boot checks', () => {
 		expect(error.message).toContain('b.order.placed');
 	});
 
+	test('a module name that is not lower case is named as the cause', async () => {
+		const modules = [
+			eventsModule,
+			defineModule({ name: 'Shop', emits: ['shop.order.placed'] }),
+		];
+		const error = refusal(() => createEvents({ store: { modules } as never }));
+		expect(error.code).toBe('events.foreign-type');
+		expect(error.message).toContain('the module name "Shop" is not lower case');
+	});
+
 	test('a registry without eventsModule is refused', async () => {
 		const modules = [defineModule({ name: 'a', emits: ['a.x.y'] })];
 		expect(

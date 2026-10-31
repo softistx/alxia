@@ -50,7 +50,7 @@ export const notifications = defineModule({
 One more code is thrown at run time, not at boot: `events.tenant-mismatch`, when an
 `_outbox` row or a job names a tenant other than the one it was found in. The
 row is refused and stays pending, which holds back that tenant's later events;
-see [troubleshooting](troubleshooting.md#tenant-mismatch).
+see [troubleshooting](troubleshooting.md#the-outbox-of-tenant-x-holds-event--of-tenant-y).
 
 A type two modules declare is not an `EventsError`: `@alxia/modules` refuses it
 when the registry is resolved, with a `ModuleGraphError` of code
@@ -114,11 +114,11 @@ await scope.mongo.as(viewer.id).transaction(async (tx) => {
 
 Three things are refused with an `EventsError`:
 
-- `undeclared-type`: the type is in no module's `emits`.
-- `invalid-payload`: the payload is not plain JSON. A `Date` or an `ObjectId`
+- `events.undeclared-type`: the type is in no module's `emits`.
+- `events.invalid-payload`: the payload is not plain JSON. A `Date` or an `ObjectId`
   would be turned into a string by the queue and arrive changed; send ISO
   strings and hex ids.
-- `no-transaction`: the handle is not a transaction's. An event written
+- `events.no-transaction`: the handle is not a transaction's. An event written
   outside the transaction of its change can be lost or can describe a change
   that never happened. `emit(source, event, { standalone: true })` writes it
   alone when there is no change to go with it.

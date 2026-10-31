@@ -128,6 +128,9 @@ describe('a catalogue that cannot be built (boot errors)', () => {
 		expect(
 			code([defineModule({ name: 'x', defaultGrants: { nobody: [] } })]),
 		).toBe('access.unknown-role');
+		expect(() =>
+			createAccess([sales], { roles: ['owner'], all: 'ghost' as 'owner' }),
+		).toThrow(expect.objectContaining({ code: 'access.unknown-role' }));
 		expect(
 			code([
 				defineModule({

@@ -18,9 +18,7 @@ bun add -d typescript
 ```
 
 They are peers, with `@alxia/rate-limit` for `redisStore` and `@alxia/cache`
-for `redisCacheStore`. `@nxgt/redis` is `^0.9.0` (it was `^0.7.0 || ^0.8.0 || ^0.9.0`; the
-workspace builds every package against one floor, and `@alxia/events` needs
-0.9's queue). `redisStore` reads the rate from the bound limit's `definition`. **Bun 1.4 or
+for `redisCacheStore`. The peer `@nxgt/redis` is `^0.9.0`: bump from 0.7 or 0.8. `redisStore` reads the rate from the bound limit's `definition`. **Bun 1.4 or
 later**: Bun's `RedisClient` is what the nxgt packages run on.
 
 ## A shared rate limit
@@ -213,7 +211,7 @@ its headers from it (one it is given that differs throws at declaration).
 string, and the idempotency's `schema` is `idempotencyResult`: another is a
 compile error. A rate limit moved from `redisStore(handle, { name })` starts
 its counts again, the layouts differing; an idempotency keeps its keys. Both
-older forms stay. [More](docs/guide/connecting.md#defined-once-in-defineredis).
+older forms stay. [More](https://github.com/softistx/alxia/blob/develop/packages/redis/docs/guide/connecting.md#defined-once-in-defineredis).
 
 ## Testing
 

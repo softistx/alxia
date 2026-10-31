@@ -94,3 +94,7 @@ rest of the package is plain TypeScript.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/modules/docs/troubleshooting.md): an error message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/modules/docs/roadmap.md): what is coming, and what is not planned.
 - [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [Start in 5 minutes](https://github.com/softistx/alxia/blob/develop/docs/start.md).
+
+## License
+
+MIT
