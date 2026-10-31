@@ -85,6 +85,7 @@ app.listen(3000); // in a test, in process: await app.request('/users/1')
 | [`@alxia/records`](packages/records) | referential integrity and hard delete: a registry of what points at what, and a one-transaction purge that refuses while a referrer holds the record, over ports for the database and the audit log |
 | [`@alxia/modules`](packages/modules) | an application's modules: a manifest each, a registry resolved in dependency order, collection access typed per module, and a boundary test |
 | [`@alxia/tenancy`](packages/tenancy) | tenancy on `@nxgt/mongo`: one contract, a database per organisation next to a core database or a single database, a request's scope from a header, provisioning and a loop over every tenant |
+| [`@alxia/events`](packages/events) | an event bus with a transactional outbox: events written in the transaction of the change, relayed to queues under a leader lock, applied once through an inbox, with `drain` for runs without Redis |
 | [`@alxia/context-storage`](packages/context-storage) | the request's context anywhere it runs, typed by the app: `hono/context-storage` for alxia |
 | [`@alxia/di`](packages/di) | dependency injection on `@nxgt/di`: typed Tokens, a lazy Scope per request disposed when it ends, values exposed by name to the routes that read them |
 | [`@alxia/create`](packages/create) | `bun create @alxia`: a new app from a template (`minimal`, `api`, `graphql` or `react-router`), its dependencies at the newest versions alxia accepts |

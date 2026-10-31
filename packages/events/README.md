@@ -1,0 +1,126 @@
+# @alxia/events
+
+An event bus for an application on [`@nxgt/mongo`](https://www.npmjs.com/package/@nxgt/mongo)
+and [`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis), built on a
+transactional outbox. A module writes an event in the same MongoDB transaction
+as the change that caused it, so the two stand or fall together. A relay hands
+each event to the modules that subscribed, through queues; each subscriber
+applies it once, however many times it is delivered.
+
+```sh
+bun add @alxia/events @alxia/modules @alxia/tenancy @nxgt/mongo @nxgt/redis mongodb zod
+bun add -d typescript
+```
+
+MongoDB must run as a **replica set** (transactions need one). See
+[troubleshooting](docs/troubleshooting.md#transaction-numbers-are-only-allowed-on-a-replica-set-member-or-mongos).
+
+## In 30 seconds
+
+```ts
+import { defineModule } from '@alxia/modules';
+import { createEvents, eventsModule } from '@alxia/events';
+
+// 1. Declare what a module emits and what it subscribes to.
+export const shop = defineModule({
+	name: 'shop',
+	emits: ['shop.order.placed'],
+});
+
+export const billing = defineModule({
+	name: 'billing',
+	subscribers: {
+		'shop.order.placed': async (event, context) => {
+			// `context.mongo` is in the transaction that records the inbox row.
+			const { mongo } = tenancy.forModule(context, 'billing');
+			await mongo.db.invoices.create({ orderId: event.aggregate.id });
+		},
+	},
+});
+
+// 2. Put the kernel module in the registry you give the tenant store,
+//    then build the bus from that store.
+const modules = [eventsModule, shop, billing];
+const events = createEvents({ store: tenancy /* built with `modules` */ });
+
+// 3. Emit inside the transaction of the change.
+await scope.mongo.transaction(async (tx) => {
+	const order = await tx.db.orders.create({ label: 'Ada' });
+	await events.emit(
+		{ tenant: scope.tenant, mongo: tx },
+		{
+			type: 'shop.order.placed',
+			aggregate: { type: 'order', id: order.id },
+			payload: { label: 'Ada' },
+		},
+	);
+});
+```
+
+## Delivery
+
+In production, a relay and workers run beside the app. Each module that
+subscribes gets a queue, `events.<module>`:
+
+```ts
+import { bindQueue } from '@nxgt/redis';
+import { eventsQueue } from '@alxia/events';
+
+const queues = { billing: bindQueue(redis.client, eventsQueue('billing')) };
+const events = createEvents({ store: tenancy, queues });
+
+const relay = events.relay({ redis: redis.client }); // one leader per deployment
+relay.start();
+const workers = events.work();
+
+// on shutdown
+await relay.stop();
+await workers.stop();
+```
+
+Without Redis (dev, tests), run the subscribers in your process, in order:
+
+```ts
+await events.drain(scope.tenant.id); // omit the tenant to drain every tenant
+```
+
+## Guarantees
+
+- **Atomic emit.** The event is in `_outbox` if and only if the transaction
+  that emitted it committed.
+- **At least once.** The relay enqueues a job per (event, subscriber) with
+  `jobId = <eventId>:<module>:<type>`, then marks the event dispatched. A crash
+  in between enqueues the same ids again, which the queue ignores.
+- **Applied once.** A subscriber's effects and its `_inbox` row commit in one
+  transaction; a second delivery finds the row and does nothing.
+- **Order.** Per tenant, the relay sends events in `_id` order. There is no
+  global order, and a subscriber must tolerate reordering.
+- **Same on every store.** Emit, relay and `drain` run unchanged on
+  `perOrganization` and `single` (one database, one fixed tenant).
+
+## API
+
+| Export | What it does |
+| --- | --- |
+| `eventsModule` | the kernel module owning `_outbox` (TTL 7 days after dispatch) and `_inbox` (30 days); add it to the registry |
+| `createEvents({ store, queues?, batchSize? })` | the bus; checks the registry at once |
+| `events.emit(source, event, options?)` | writes the event through `source.mongo`, a transaction's handle |
+| `events.drain(tenant?)` | runs pending events through their subscribers in this process |
+| `events.relay(options)` | `tick()`, `start()`, `stop()`: a leader-locked poll that enqueues jobs |
+| `events.work(options?)` | one `@nxgt/redis` worker per subscribing module's queue |
+| `events.deadLetters({ limit? })` | the jobs that used all their attempts |
+| `eventsQueue(module, options?)`, `queueName(module)` | the definition of `events.<module>` |
+| `deliver(mongo, core, event, subscription)` | one subscriber, once: inbox row plus handler in a transaction |
+| `emittedTypes(modules)`, `subscriptionsOf(modules)` | the registry readers behind the boot checks |
+| `outbox`, `inbox`, `OUTBOX_TTL`, `INBOX_TTL` | the collection definitions and TTLs |
+| `EventsError` | the refusals, with a stable `code` |
+| `EventEnvelope`, `EventInput`, `EmitSource`, `EventsMongo`, `Subscriber`, `SubscriberContext`, `DeadLetter`, `Relay`, `RelayOptions`, `Events`, `EventsOptions` | the types |
+
+Peers: `@alxia/modules`, `@alxia/tenancy`, `@nxgt/mongo`, `@nxgt/redis`,
+`mongodb`, `zod`, `typescript`.
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/events/docs/guide.md): the envelope, the outbox, subscribers, the relay and workers, `drain`, dead letters, tenants, testing.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/events/docs/troubleshooting.md): an error message, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/events/docs/roadmap.md): what is coming, and what is not planned.

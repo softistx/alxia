@@ -92,10 +92,10 @@ describe('read', () => {
 			// @alxia/react-router's is a devDependency: its /session spec checks
 			// that the names it speaks are janus's.
 			['@nxgt/janus', ['packages/janus', 'packages/react-router']],
-			['@nxgt/mongo', ['packages/tenancy']],
+			['@nxgt/mongo', ['packages/events', 'packages/tenancy']],
 			['@nxgt/openapi-codegen', ['packages/create']],
 			['@nxgt/openapi-httpyz', ['packages/create']],
-			['@nxgt/redis', ['packages/redis']],
+			['@nxgt/redis', ['packages/events', 'packages/redis']],
 			// @alxia/graphql's is a devDependency, for its observed-socket spec.
 			['@nxgt/telemetry', ['packages/graphql', 'packages/telemetry']],
 		]);
