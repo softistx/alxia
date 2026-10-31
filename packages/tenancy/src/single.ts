@@ -2,6 +2,7 @@ import type { Mongo, MongoActor } from '@nxgt/mongo';
 import { migrate } from '@nxgt/mongo/migrations';
 import { unknownOrganization } from './errors';
 import { dbOf, migrateTargets } from './migrate';
+import { bindModules } from './modules';
 import type {
 	MigrationLists,
 	Resolution,
@@ -40,8 +41,10 @@ export function single<C, K = C, T extends Tenant = Tenant>(
 	const core = (options.core ?? mongo) as unknown as Mongo<K>;
 	const apart = options.core !== undefined && dbOf(core) !== dbOf(mongo);
 	const tenant = { ...options.tenant, status: 'active' } as unknown as T;
-	const migrations = options.migrations ?? [];
-	const coreMigrations = options.coreMigrations ?? [];
+	const { modules, forModule, migrations, coreMigrations } = bindModules(
+		options.modules ?? [],
+		options,
+	);
 
 	const names = (ref: string) => {
 		const text = ref.trim().toLowerCase();
@@ -71,6 +74,8 @@ export function single<C, K = C, T extends Tenant = Tenant>(
 	return {
 		kind: 'single',
 		core,
+		modules,
+		forModule,
 		async resolve(ref) {
 			return names(ref) ? tenant : undefined;
 		},

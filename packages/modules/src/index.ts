@@ -29,6 +29,8 @@ export {
 export type {
 	CollectionsOf,
 	CoreCollectionsOf,
+	ModuleCoreHandle,
+	ModuleCoreMongo,
 	ModuleHandle,
 	ModuleMongo,
 	ModuleName,

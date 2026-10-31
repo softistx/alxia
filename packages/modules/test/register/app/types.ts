@@ -1,6 +1,8 @@
 import { expectTypeOf } from 'bun:test';
 import type {
 	CollectionsOf,
+	ModuleCoreHandle,
+	ModuleCoreMongo,
 	ModuleHandle,
 	ModuleMongo,
 	ModuleName,
@@ -57,3 +59,15 @@ handle.transaction(async (tx) => {
 	// @ts-expect-error still narrowed inside a transaction
 	tx.db.audit;
 });
+
+// The core database follows the same rule through `coreCollections`.
+expectTypeOf<keyof ModuleCoreMongo<'notes'>>().toEqualTypeOf<'accounts'>();
+expectTypeOf<keyof ModuleCoreMongo<'audit'>>().toEqualTypeOf<never>();
+interface CoreHandle {
+	readonly db: { accounts: 1; other: 2 };
+	transaction<T>(fn: (tx: CoreHandle) => Promise<T>): Promise<T>;
+}
+declare const core: ModuleCoreHandle<'notes', CoreHandle>;
+core.db.accounts;
+// @ts-expect-error other is not a core collection of notes or base
+core.db.other;

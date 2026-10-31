@@ -80,6 +80,15 @@ export type ModuleMongo<
 	? Readonly<PickedBy<ViewOf<List, Name>[], 'collections'>>
 	: Open;
 
+// The same for the core database: the `coreCollections` of `Name` and of the
+// modules its `dependsOn` names. With nothing registered, any name.
+export type ModuleCoreMongo<
+	Name extends ModuleName<List>,
+	List extends readonly unknown[] = Registered,
+> = IsRegistered extends true
+	? Readonly<PickedBy<ViewOf<List, Name>[], 'coreCollections'>>
+	: Open;
+
 // A host's handle (`db` keyed by collection name, and a `transaction`)
 // narrowed to `ModuleMongo<Name>`; a module typed against it fails typecheck
 // on any other collection.
@@ -99,6 +108,27 @@ export type ModuleHandle<
 		: Handle['db'];
 	transaction<T>(
 		fn: (tx: ModuleHandle<Name, Handle, List>) => Promise<T>,
+		options?: Parameters<Handle['transaction']>[1],
+	): Promise<T>;
+};
+
+// A host's core handle narrowed to `ModuleCoreMongo<Name>` the same way.
+export type ModuleCoreHandle<
+	Name extends ModuleName<List>,
+	Handle extends {
+		readonly db: object;
+		readonly transaction: (...args: never) => unknown;
+	},
+	List extends readonly unknown[] = Registered,
+> = Omit<Handle, 'db' | 'transaction'> & {
+	readonly db: IsRegistered extends true
+		? Pick<
+				Handle['db'],
+				Extract<keyof ModuleCoreMongo<Name, List>, keyof Handle['db']>
+			>
+		: Handle['db'];
+	transaction<T>(
+		fn: (tx: ModuleCoreHandle<Name, Handle, List>) => Promise<T>,
 		options?: Parameters<Handle['transaction']>[1],
 	): Promise<T>;
 };

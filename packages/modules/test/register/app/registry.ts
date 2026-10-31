@@ -4,7 +4,11 @@ const notes = { kind: 'notes' } as const;
 const tags = { kind: 'tags' } as const;
 const audit = { kind: 'audit' } as const;
 
-export const base = defineModule({ name: 'base', collections: { tags } });
+export const base = defineModule({
+	name: 'base',
+	collections: { tags },
+	coreCollections: { accounts: { kind: 'accounts' } as const },
+});
 export const notesModule = defineModule({
 	name: 'notes',
 	dependsOn: ['base'],

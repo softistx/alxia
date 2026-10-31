@@ -1,3 +1,4 @@
+import { collectionsOf, coreCollectionsOf, defineModule } from '@alxia/modules';
 import {
 	connectMongo,
 	defineCollection,
@@ -163,3 +164,65 @@ export async function register(
 }
 
 export type TestMongo<C> = Mongo<C>;
+
+export const tags = defineCollection({
+	name: 'tags',
+	schema: z.object({ _id: id(), label: z.string().min(1) }),
+	actors: { type: z.string() },
+});
+
+/**
+ * The registry of the contract: `notes` (a tenant collection and the two marker
+ * migrations), `tags` (depends on notes, one more tenant collection) and
+ * `orgs` (the registry's collection, in the core database).
+ */
+export function testModules(ids: [string, string]) {
+	return [
+		defineModule({
+			name: 'notes',
+			collections: { notes },
+			migrations: ids.map((id) => marker(id)),
+		}),
+		defineModule({ name: 'tags', dependsOn: ['notes'], collections: { tags } }),
+		defineModule({ name: 'orgs', coreCollections: { organizations } }),
+	] as const;
+}
+
+type Collections = Record<string, ReturnType<typeof defineCollection>>;
+
+/** `configure` for a tenant store whose collections come from the registry. */
+export async function moduleWiring(modules: ReturnType<typeof testModules>) {
+	const client = await testClient();
+	const collections = collectionsOf(modules) as unknown as Collections;
+	return (database: string) => defineMongo({ client, database, collections });
+}
+
+/** The core database wired with the registry's core collections. */
+export async function openModuleCore(modules: ReturnType<typeof testModules>) {
+	return openMongo(
+		defineMongo({
+			client: await testClient(),
+			database: unique('core'),
+			collections: coreCollectionsOf(modules) as unknown as {
+				organizations: typeof organizations;
+			},
+			autoSync: true,
+		}),
+	);
+}
+
+/** One database wired with the tenant and the core collections of the registry. */
+export async function openModuleSingle(
+	modules: ReturnType<typeof testModules>,
+) {
+	return openMongo(
+		defineMongo({
+			client: await testClient(),
+			database: unique('single'),
+			collections: {
+				...collectionsOf(modules),
+				...coreCollectionsOf(modules),
+			} as unknown as Collections,
+		}),
+	);
+}

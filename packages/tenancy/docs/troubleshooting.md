@@ -8,6 +8,7 @@
 - [`the tenant cache holds at least one entry`](#the-tenant-cache-holds-at-least-one-entry)
 - [`rollback: "x" is in no migration list`](#rollback-x-is-in-no-migration-list)
 - [`migration failed in <database>`](#migration-failed-in-database)
+- [`module "x" is not registered` / `collection "y" of module "x" is not wired`](#module-x-is-not-registered--collection-y-of-module-x-is-not-wired)
 - [An organisation stays `provisioning`](#an-organisation-stays-provisioning)
 - [A request with a valid header is a 404](#a-request-with-a-valid-header-is-a-404)
 
@@ -74,3 +75,16 @@ Check, in order: the organisation is `active`; the header is the one the store
 reads (`store.header`); `membership` returns something other than `null` or
 `false` for this account; and the registry's `findById` / `findBySlug` do not
 hide it (soft delete).
+
+## `module "x" is not registered` / `collection "y" of module "x" is not wired`
+
+`forModule` throws a `ModuleWiringError`. Either the store was built without
+`modules` (or without that module), or the `defineMongo` wiring lacks a
+collection the module (or one of its `dependsOn`) declares. Wire
+`collectionsOf(modules)` into the tenant databases and
+`coreCollectionsOf(modules)` into the core one; on a `single` store with no
+separate core, both into the one database.
+
+```ts
+defineMongo({ client, database, collections: collectionsOf(modules) });
+```

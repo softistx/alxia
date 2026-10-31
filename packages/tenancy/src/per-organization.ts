@@ -9,6 +9,7 @@ import { migrate } from '@nxgt/mongo/migrations';
 import { createTenantDatabases, type TenantDatabases } from './databases';
 import { organizationRequired, slugTaken, unknownOrganization } from './errors';
 import { dbOf, migrateTargets } from './migrate';
+import { bindModules } from './modules';
 import type { DatabaseNaming } from './names';
 import type {
 	EachTenantOptions,
@@ -61,8 +62,10 @@ export function perOrganization<C, K, T extends Tenant, M>(
 ): PerOrganizationStore<C, K, T, M> {
 	const { core, registry, membership } = options;
 	const header = options.header ?? DEFAULT_HEADER;
-	const migrations = options.migrations ?? [];
-	const coreMigrations = options.coreMigrations ?? [];
+	const { modules, forModule, migrations, coreMigrations } = bindModules(
+		options.modules ?? [],
+		options,
+	);
 	const databases = createTenantDatabases<C>({
 		database: options.database,
 		configure: options.configure,
@@ -106,6 +109,8 @@ export function perOrganization<C, K, T extends Tenant, M>(
 	return {
 		kind: 'perOrganization',
 		core,
+		modules,
+		forModule,
 		header,
 		databases,
 		resolve,

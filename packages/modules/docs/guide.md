@@ -133,6 +133,10 @@ await handle.transaction(async (tx) => {
 });
 ```
 
+`ModuleCoreMongo<Name>` and `ModuleCoreHandle<Name, Handle>` do the same for
+`coreCollections`, the core database's. `@alxia/tenancy`'s `forModule` hands
+both from a request's scope.
+
 ## Testing boundaries
 
 `assertBoundaries` needs Bun: it reads files with `Bun.Glob` and `Bun.file`.

@@ -1,0 +1,12 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"rootDir": "../../../..",
+		"declaration": false,
+		"declarationMap": false,
+		"paths": { "@alxia/modules": ["../../../modules/src/index.ts"] }
+	},
+	"include": ["."],
+	"exclude": []
+}

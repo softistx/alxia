@@ -10,13 +10,15 @@ direction, not a commitment.
   header, membership, provisioning, a loop over every tenant, sync and
   migrations) and the `single` store (one database, one fixed tenant).
 
+- **Module handles.** `forModule` hands a module its `ModuleMongo` handles
+  from a scope: its collections on the tenant's database, its core ones on the
+  core database, typed to what it owns or depends on. Provisioning, `sync`
+  and `migrate` read the registry.
+
 ## Next
 
 These integrations are with packages that are planned and not published yet.
 
-- **Modules.** `@alxia/modules` passing the scope to a module's services and
-  jobs, and splitting its collections between the core and the tenant
-  databases.
 - **Access.** `@alxia/access` reading the membership a scope carries as the
   viewer's role.
 - **Events.** `@alxia/events` visiting the outbox of each tenant through

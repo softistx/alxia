@@ -83,7 +83,7 @@ rest of the package is plain TypeScript.
 | `boundaryViolations(files, registry, options)`, `importsOf(text)` | the pure checker, and the import scanner it uses |
 | `ModuleGraphError` | the error `resolveModules` and the readers throw |
 | `Register` | merged by the app to name its registry |
-| `ModuleMongo`, `ModuleHandle`, `ModuleName`, `CollectionsOf`, `CoreCollectionsOf`, `ViewOf`, `Registered` | the types derived from the registry |
+| `ModuleMongo`, `ModuleHandle`, `ModuleCoreMongo`, `ModuleCoreHandle`, `ModuleName`, `CollectionsOf`, `CoreCollectionsOf`, `ViewOf`, `Registered` | the types derived from the registry |
 | `Module`, `ModuleDefinition`, `ModuleJob`, `NamedJob`, `BoundaryOptions`, `BoundaryViolation` | the other types |
 
 `typescript` is the only peer, for the declarations.

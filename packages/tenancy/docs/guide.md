@@ -14,12 +14,58 @@ plugin, runs on either store and never names a database.
 | `tenantOf(request)` | `found`, `none` or `unknown`, from the request's header |
 | `databaseOf(tenant)` | the tenant's database, no actor |
 | `scope(request, viewer)` | `{ tenant, mongo, core, member }`, or a `TenancyError` |
+| `forModule(source, name)` | a module's `{ mongo, core }` handles, typed to its collections and its `dependsOn` ones |
+| `modules` | the registry the store was given |
 | `eachTenant(fn, { withDeleted })` | `fn(tenant, mongo)` on each tenant in turn |
 | `provision(input, actor)` | registers, prepares the database, activates |
 | `prepare(id)` | sync, then migrations, on one tenant's database |
 | `sync()` | sync the core, then every tenant; the database names |
 | `migrate(mode)` | apply, status or rollback on the core, then every tenant |
 | `close()` | forgets what the store cached |
+
+## Module handles
+
+Pass the registry as `modules` (to `perOrganization` or `single`) and the store
+reads the migrations from it: `migrationsOf` for each tenant database,
+`coreMigrationsOf` for the core one, in dependency order, before the explicit
+`migrations` and `coreMigrations`. Indexes come from the collections your
+`defineMongo` wiring holds, so wire them from the registry:
+
+```ts
+import { collectionsOf, coreCollectionsOf } from '@alxia/modules';
+
+const core = await openMongo(
+	defineMongo({ client, database: 'app_core', collections: coreCollectionsOf(modules) }),
+);
+const tenancy = perOrganization({
+	core,
+	modules,
+	configure: (database) =>
+		defineMongo({ client, database, collections: collectionsOf(modules) }),
+	// …
+});
+```
+
+A request, a job or a subscriber then asks for its module:
+
+```ts
+const scope = await tenancy.scope(request, viewer);
+const { mongo, core } = tenancy.forModule(scope, 'notes');
+
+await tenancy.eachTenant(async (_tenant, mongo) => {
+	const { mongo: notes } = tenancy.forModule({ mongo, core: tenancy.core }, 'notes');
+	// …
+});
+```
+
+With `Register` merged (see `@alxia/modules`), `mongo.db` holds the module's
+`collections` and those of its `dependsOn`, `core.db` its `coreCollections`
+and theirs; anything else is a compile error. The narrowing is in the types:
+at run time `forModule` checks that the module is registered and that every
+collection it may reach is wired in the database it belongs to, then returns
+the same handles. On a `single` store `mongo` and `core` are the same
+database, so wire both lists into it. A collection name cannot be both a tenant
+and a core collection.
 
 ## Wiring `perOrganization`
 
