@@ -15,6 +15,8 @@ export interface Subscription {
 export const subscriptionId = (module: string, type: string) =>
 	`${module}:${type}`;
 
+const MODULE_NAME = /^[a-z][a-z0-9_-]*$/;
+
 /**
  * The registry's `emits`, by type. Refuses a malformed type or one a module
  * does not own; a type two modules declare is `emitsOf`'s `ModuleGraphError`.
@@ -29,9 +31,14 @@ export function emittedTypes(modules: readonly Module[]): Map<string, string> {
 			);
 		}
 		if (type.split('.')[0] !== name) {
+			// The type is lower case (checked above), so a module name that is not
+			// lower case can never be its first segment: the name is the cause.
+			const detail = MODULE_NAME.test(name)
+				? 'a module emits only <module>.<entity>.<verb> of itself'
+				: `the module name "${name}" is not lower case [a-z][a-z0-9_-]*, so no event type can start with it: rename the module`;
 			throw new EventsError(
 				'events.foreign-type',
-				`module "${name}" emits "${type}", whose first segment is not its own name: a module emits only <module>.<entity>.<verb> of itself`,
+				`module "${name}" emits "${type}", whose first segment is not its own name: ${detail}`,
 			);
 		}
 	}

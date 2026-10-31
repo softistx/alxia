@@ -49,8 +49,10 @@ refusal through):
 
 ```ts
 import { requirePermission, requireSelf } from '@alxia/access';
+import { lazyScope } from '@alxia/tenancy';
 
-// viewer: { id: string } | null, the signed-in account (the `Viewer` type)
+// In a request: `store` is your tenancy store (@alxia/tenancy), `request` the
+// Request, `viewer` the signed-in account ({ id: string } | null), `userId` an id.
 const ctx = { viewer, access, scope: lazyScope(store, request, viewer) };
 
 const scope = await requirePermission(ctx, 'notes:manage'); // 401, 400, 404, 403

@@ -7,7 +7,9 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing in progress: `idempotency` as a middleware, the last change planned,
+The peer floor moves to `@nxgt/redis` `^0.9.0` in the upcoming release (was `^0.7.0 || ^0.8.0 || ^0.9.0`): an app on 0.7 or 0.8 bumps it, since `@alxia/events` needs 0.9's queue.
+
+Otherwise nothing in progress: `idempotency` as a middleware, the last change planned,
 shipped in 0.2.0 and finished in 0.3.0.
 
 ## Next

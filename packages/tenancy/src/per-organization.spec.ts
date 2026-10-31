@@ -371,9 +371,13 @@ describe('sync and migrate over every database', () => {
 		});
 		const own = dbOf(await store.databaseOf(org));
 		expect(await own.collection('markers').countDocuments()).toBe(1);
-		await expect(
-			store.migrate({ kind: 'rollback', to: 'nope', dryRun: true }),
-		).rejects.toBeInstanceOf(UnknownMigrationError);
+		const unknown = await store
+			.migrate({ kind: 'rollback', to: 'nope', dryRun: true })
+			.catch((error: unknown) => error);
+		expect(unknown).toBeInstanceOf(UnknownMigrationError);
+		expect((unknown as UnknownMigrationError).code).toBe(
+			'tenancy.unknown-migration',
+		);
 	});
 });
 

@@ -6,8 +6,10 @@
 - [`the payload of "x" is not JSON data`](#the-payload-of-x-is-not-json-data)
 - [`module "m" subscribes to "x", which no module in the registry emits`](#module-m-subscribes-to-x-which-no-module-in-the-registry-emits)
 - [`the registry lacks eventsModule`](#the-registry-lacks-eventsmodule)
-- [`invalid-type`, `duplicate-declaration` and `foreign-type`](#invalid-type-duplicate-declaration-and-foreign-type)
-- [`tenant-mismatch`](#tenant-mismatch)
+- [`module "m" emits "x", which is not <module>.<entity>.<verb> in lower case`](#module-m-emits-x-which-is-not-moduleentityverb-in-lower-case)
+- [`module "m" emits "x", whose first segment is not its own name`](#module-m-emits-x-whose-first-segment-is-not-its-own-name)
+- [`event type "x" is declared by two modules`](#event-type-x-is-declared-by-two-modules)
+- [`the outbox of tenant "x" holds event … of tenant "y"`](#the-outbox-of-tenant-x-holds-event--of-tenant-y)
 - [`this needs the bound events.<module> queues`](#this-needs-the-bound-eventsmodule-queues)
 - [`module "m" has no subscriber for "x" in this process's registry`](#module-m-has-no-subscriber-for-x-in-this-processs-registry)
 - [`module "m" has subscribers but no queue`](#module-m-has-subscribers-but-no-queue)
@@ -68,13 +70,21 @@ owns it, in the registry the store and `createEvents` share.
 emitting module is not in the registry. Register it, or fix the key of
 `subscribers`.
 
-## `invalid-type`, `duplicate-declaration` and `foreign-type`
+## `module "m" emits "x", which is not <module>.<entity>.<verb> in lower case`
 
-`EventsError` (`events.invalid-type`, `events.foreign-type`), at boot. `module "m" emits "x", which is not <module>.<entity>.<verb> in lower case`: rename the type (`shop.order.placed`). `event type "x" is declared by two modules`, a `ModuleGraphError` (`modules.duplicate-declaration`) from `@alxia/modules`: a type has one owner; keep it in one module's `emits`. `foreign-type`: `module "a" emits "b.order.placed"`, whose first segment is not its own name; a module emits only the types it owns (`a.…`), so move the entry to `b`.
+`EventsError` `events.invalid-type`, at boot. Rename the type (`shop.order.placed`).
 
-## `tenant-mismatch`
+## `module "m" emits "x", whose first segment is not its own name`
 
-`EventsError`, at run time (at `drain`, in the relay's `onError`, or in a worker): an `_outbox` row or a job names a tenant other than the database or job it was found in. The row is refused and stays pending, so that tenant's later events wait behind it (rows are dispatched in `_id` order) until it is dealt with. Find how it got there (a copied database, a hand-written row), then delete or correct the row; the next tick resumes.
+`EventsError` `events.foreign-type`, at boot. `module "a" emits "b.order.placed"`: a module emits only the types it owns (`a.…`), so move the entry to `b`. When the message adds that the module name is not lower case, the name itself is the cause: the type's first segment is always lower case, so rename the module to `[a-z][a-z0-9_-]*`.
+
+## `event type "x" is declared by two modules`
+
+A `ModuleGraphError` (`modules.duplicate-declaration`) from `@alxia/modules`, not an `EventsError`. A type has one owner; keep it in one module's `emits`.
+
+## `the outbox of tenant "x" holds event … of tenant "y"`
+
+`EventsError` `events.tenant-mismatch`, at run time (at `drain` or in the relay's `onError`). A worker throws the sibling `job … is for tenant "x" but carries an event of tenant "y"`. An `_outbox` row or a job names a tenant other than the database or job it was found in. The row is refused and stays pending, so that tenant's later events wait behind it (rows are dispatched in `_id` order) until it is dealt with. Find how it got there (a copied database, a hand-written row), then delete or correct the row; the next tick resumes.
 
 ## `the registry lacks eventsModule`
 

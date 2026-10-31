@@ -18,9 +18,7 @@ bun add -d typescript
 ```
 
 They are peers, with `@alxia/rate-limit` for `redisStore` and `@alxia/cache`
-for `redisCacheStore`. `@nxgt/redis` is `^0.9.0` (it was `^0.7.0 || ^0.8.0 || ^0.9.0`; the
-workspace builds every package against one floor, and `@alxia/events` needs
-0.9's queue). `redisStore` reads the rate from the bound limit's `definition`. **Bun 1.4 or
+for `redisCacheStore`. The peer `@nxgt/redis` is `^0.9.0`: bump from 0.7 or 0.8. `redisStore` reads the rate from the bound limit's `definition`. **Bun 1.4 or
 later**: Bun's `RedisClient` is what the nxgt packages run on.
 
 ## A shared rate limit

@@ -13,13 +13,23 @@ bun add -d typescript
 ```
 
 MongoDB must run as a **replica set** (transactions need one). See
-[troubleshooting](docs/troubleshooting.md#transaction-numbers-are-only-allowed-on-a-replica-set-member-or-mongos).
+[troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/events/docs/troubleshooting.md#transaction-numbers-are-only-allowed-on-a-replica-set-member-or-mongos).
 
 ## In 30 seconds
 
 ```ts
-import { defineModule } from '@alxia/modules';
-import { createEvents, eventsModule } from '@alxia/events';
+import { collectionsOf, defineModule } from '@alxia/modules';
+import {
+	createEvents,
+	eventsModule,
+	type EventEnvelope,
+	type SubscriberContext,
+} from '@alxia/events';
+import { single } from '@alxia/tenancy';
+import { connectMongo, defineMongo, openMongo } from '@nxgt/mongo';
+
+// `Tenant` and `Core` are your tenant and core collection wirings
+// (see the guide, "Write a subscriber").
 
 // 1. Declare what a module emits and what it subscribes to.
 export const shop = defineModule({
@@ -30,7 +40,10 @@ export const shop = defineModule({
 export const billing = defineModule({
 	name: 'billing',
 	subscribers: {
-		'shop.order.placed': async (event, context) => {
+		'shop.order.placed': async (
+			event: EventEnvelope,
+			context: SubscriberContext<'billing', Tenant, Core>,
+		) => {
 			// `context.mongo` is in the transaction that records the inbox row,
 			// and narrowed to billing's collections and those of its dependsOn.
 			const { mongo } = context;
@@ -42,9 +55,18 @@ export const billing = defineModule({
 // 2. Put the kernel module in the registry you give the tenant store,
 //    then build the bus from that store.
 const modules = [eventsModule, shop, billing];
-// `tenancy` is a `single(...)` or `perOrganization(...)` store of
-// @alxia/tenancy built with `modules`; `scope` is a request's scope.
+const { client } = await connectMongo(process.env.MONGO_URI!);
+const mongo = await openMongo(
+	defineMongo({ client, database: 'app', collections: collectionsOf(modules) }),
+);
+const tenancy = single({
+	mongo,
+	modules,
+	tenant: { id: 'main', slug: 'main', name: 'Main' },
+}); // or perOrganization(...), see @alxia/tenancy
 const events = createEvents({ store: tenancy });
+// `request` and `viewer` are the HTTP request and its signed-in account
+const scope = await tenancy.scope(request, viewer);
 
 // 3. Emit inside the transaction of the change.
 await scope.mongo.transaction(async (tx) => {
@@ -66,11 +88,12 @@ In production, a relay and workers run beside the app. Each module that
 subscribes gets a queue, `events.<module>`:
 
 ```ts
-import { bindQueue } from '@nxgt/redis';
-import { eventsQueue } from '@alxia/events';
+import { bindQueue, connectRedis } from '@nxgt/redis';
+import { createEvents, eventsQueue } from '@alxia/events';
 
+const redis = await connectRedis(process.env.REDIS_URL!);
 const queues = { billing: bindQueue(redis.client, eventsQueue('billing')) };
-const events = createEvents({ store: tenancy, queues });
+const events = createEvents({ store: tenancy, queues }); // `tenancy` from above
 
 const relay = events.relay({ redis: redis.client }); // one leader per deployment
 relay.start();
@@ -127,3 +150,7 @@ Peers: `@alxia/modules`, `@alxia/tenancy`, `@nxgt/mongo`, `@nxgt/redis`,
 - [Guide](https://github.com/softistx/alxia/blob/develop/packages/events/docs/guide.md): the envelope, the outbox, subscribers, the relay and workers, `drain`, dead letters, tenants, testing.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/events/docs/troubleshooting.md): an error message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/events/docs/roadmap.md): what is coming, and what is not planned.
+
+## License
+
+MIT

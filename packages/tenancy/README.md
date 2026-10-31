@@ -193,3 +193,7 @@ Peers: `@alxia/modules`, `@nxgt/mongo`, `mongodb`, `typescript`.
 - [Guide](https://github.com/softistx/alxia/blob/develop/packages/tenancy/docs/guide.md): the registry port, a request's scope, jobs, provisioning, migrations, the single store, testing.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/tenancy/docs/troubleshooting.md): an error message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/tenancy/docs/roadmap.md): what is coming, and what is not planned.
+
+## License
+
+MIT
