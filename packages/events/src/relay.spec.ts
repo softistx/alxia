@@ -4,6 +4,7 @@ import {
 	beforeAll,
 	describe,
 	expect,
+	setDefaultTimeout,
 	test,
 } from 'bun:test';
 import { bindQueue } from '@nxgt/redis';
@@ -20,6 +21,10 @@ import {
 } from '../test/harness';
 import { createEvents, type EventsQueueOptions, eventsQueue } from '.';
 import { toWire } from './envelope';
+
+// Bun fails a test after 5 s. Each one starts a MongoDB replica-set client and
+// a Redis connection, which a loaded CI runner cannot always do in that time.
+setDefaultTimeout(30_000);
 
 // These specs need Redis: `$REDIS_URL` (CI's service container), else a
 // `redis-server` on PATH started on a free port. With neither they fail.
@@ -55,7 +60,7 @@ beforeAll(async () => {
 });
 afterAll(() => server?.kill());
 
-const until = async (check: () => Promise<boolean>, ms = 8_000) => {
+const until = async (check: () => Promise<boolean>, ms = 20_000) => {
 	const deadline = Date.now() + ms;
 	while (!(await check())) {
 		if (Date.now() > deadline) throw new Error('timed out');
@@ -86,8 +91,10 @@ async function setup(queueOptions: EventsQueueOptions = {}) {
 	const definition = eventsQueue(billing, queueOptions);
 	const queue = bindQueue(client, definition);
 	cleanup.push(async () => {
+		// The queue's keys are `queue:{<name>}:…`; the braces end the name, so
+		// this one never matches another queue whose name it prefixes.
 		const keys = (await client.send('KEYS', [
-			`*${definition.name}*`,
+			`queue:{${definition.name}}:*`,
 		])) as string[];
 		if (keys.length) await client.send('DEL', keys);
 		const locks = (await client.send('KEYS', [
