@@ -211,7 +211,7 @@ its headers from it (one it is given that differs throws at declaration).
 string, and the idempotency's `schema` is `idempotencyResult`: another is a
 compile error. A rate limit moved from `redisStore(handle, { name })` starts
 its counts again, the layouts differing; an idempotency keeps its keys. Both
-older forms stay. [More](docs/guide/connecting.md#defined-once-in-defineredis).
+older forms stay. [More](https://github.com/softistx/alxia/blob/develop/packages/redis/docs/guide/connecting.md#defined-once-in-defineredis).
 
 ## Testing
 
