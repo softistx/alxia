@@ -17,6 +17,7 @@ import {
 	requireSelf,
 	requireViewer,
 } from './guards';
+import { isPermission, type Permission } from './permission';
 import {
 	membersReadPermissionWrites,
 	permissionsReadWrite,
@@ -218,13 +219,13 @@ describe('requireSelf', () => {
 });
 
 describe('guards take a permission, not any string', () => {
-	test('a string that is not <area>:read|manage does not compile', () => {
+	test('a string that is not <area>:<action> does not compile', () => {
 		const guard = (fn: () => unknown) => fn;
 		const { ctx } = context({ access, tenant: T, held: held('sales') });
 		guard(() => {
 			// @ts-expect-error not a permission
 			can(ctx, 'sample');
-			// @ts-expect-error not a permission
+			// An action beyond read and manage type-checks; createAccess refuses an undeclared one at boot.
 			requirePermission(ctx, 'sample:write');
 			// @ts-expect-error not a permission
 			requireAnyPermission(ctx, ['sample:read', 'sample']);
@@ -235,5 +236,13 @@ describe('guards take a permission, not any string', () => {
 			// @ts-expect-error not a permission
 			membersReadPermissionWrites('sample');
 		});
+	});
+});
+
+describe('a permission beyond read and manage', () => {
+	test('is accepted by the guards, typed', () => {
+		const receive: Permission = 'orders:receive';
+		expect(isPermission(receive, ['receive'])).toBe(true);
+		expect(isPermission(receive)).toBe(false);
 	});
 });

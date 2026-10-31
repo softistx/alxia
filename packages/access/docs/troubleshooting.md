@@ -19,7 +19,8 @@ for a permission two modules declare.
 
 A permission has the shape `<area>:read` or `<area>:manage`: lower case,
 digits and `_` in the area. `sales:write`, `Sales:read` and `sales` are
-refused. Rename it:
+refused. A narrower action (`orders:receive`) is allowed once the host lists
+it in `createAccess`' `actions: ['receive']`. Otherwise rename it:
 
 ```ts
 import { defineModule } from '@alxia/modules';

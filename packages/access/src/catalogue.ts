@@ -1,6 +1,6 @@
 import { type Module, permissionsOf } from '@alxia/modules';
 import { AccessCatalogueError } from './errors';
-import { isPermission, type Permission } from './permission';
+import { isActionName, isPermission, type Permission } from './permission';
 
 /**
  * The account a request is made by. `@alxia/tenancy` has its own `Viewer` of
@@ -16,6 +16,12 @@ export interface AccessOptions<R extends string, M> {
 	roles: readonly R[];
 	/** The role that holds every declared permission, whatever the grants say. */
 	all?: R;
+	/**
+	 * The actions the host allows beyond `read` and `manage`, in lower case
+	 * (`['receive']` lets a module declare `orders:receive`). A permission
+	 * with any other action is a boot error. `all` holds them too.
+	 */
+	actions?: readonly string[];
 	/**
 	 * The role a scope's `member` stands for. By default the member is the role
 	 * (`Membership<R>`). A host whose member is a record, or whose store has no
@@ -48,13 +54,16 @@ export interface Access<R extends string = string, M = R> {
 }
 
 /** The permissions of the registry, each in shape and once; `declaredBy` names the owner. */
-function declaredPermissions(modules: readonly Module[]) {
+function declaredPermissions(
+	modules: readonly Module[],
+	actions: readonly string[],
+) {
 	for (const module of modules) {
 		for (const permission of module.permissions ?? []) {
-			if (!isPermission(permission)) {
+			if (!isPermission(permission, actions)) {
 				throw new AccessCatalogueError(
 					'access.invalid-permission',
-					`module "${module.name}" declares "${permission}", which is not <area>:read or <area>:manage`,
+					`module "${module.name}" declares "${permission}", which is not <area>:read or <area>:manage${actions.map((action) => ` or <area>:${action}`).join('')}`,
 				);
 			}
 		}
@@ -109,7 +118,8 @@ function grantsByRole(
  * Builds the catalogue from the module registry; throws an
  * `AccessCatalogueError` at boot for:
  *
- * - a permission that is not `<area>:read|manage`;
+ * - a permission that is not `<area>:read|manage` or `<area>:<action>` for an
+ *   action in `options.actions`, or an invalid name in `options.actions`;
  * - a permission declared by two modules (a `ModuleGraphError`, thrown by
  *   `@alxia/modules`' `permissionsOf`);
  * - a grant to a role the host did not supply;
@@ -126,7 +136,16 @@ export function createAccess<R extends string, M = R>(
 			`the role "${all}" that holds every permission is not one of the roles`,
 		);
 	}
-	const { permissions, declaredBy } = declaredPermissions(modules);
+	const actions = options.actions ?? [];
+	for (const action of actions) {
+		if (!isActionName(action)) {
+			throw new AccessCatalogueError(
+				'access.invalid-permission',
+				`the action "${action}" is not lower case, digits and "_"`,
+			);
+		}
+	}
+	const { permissions, declaredBy } = declaredPermissions(modules, actions);
 	const granted = grantsByRole(modules, roles, declaredBy);
 	const matrix = Object.freeze(
 		Object.fromEntries(
