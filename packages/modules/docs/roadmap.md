@@ -8,15 +8,13 @@ direction, not a commitment.
 - **The first release.** Module manifests, an ordered and checked registry,
   readers for the host, collection access typed per module, and a boundary
   test.
-
-## Next
-
-These integrations are with packages that are planned and not published yet.
-
-- **Access.** Integration with `@alxia/access`: permissions and default
-  grants feeding the access catalogue directly.
-- **Events.** Integration with `@alxia/events`: `emits` and `subscribers`
-  typed by the event catalogue.
+- **Access.** `@alxia/access` builds its role catalogue from the permissions
+  and default grants modules declare.
+- **Events.** `@alxia/events` checks `emits` and subscribers against the
+  registry at boot.
+- **Tenancy.** `@alxia/tenancy`'s `forModule` hands a module its
+  `ModuleMongo` and `ModuleCoreMongo` handles from a request's scope, split
+  between the tenant and the core database.
 
 ## Later
 
@@ -30,7 +28,4 @@ Nothing scheduled yet.
 
 ## Shipped
 
-- **Tenancy.** `@alxia/tenancy`'s `forModule` hands a module its
-  `ModuleMongo` and `ModuleCoreMongo` handles from a request's scope, split
-  between the tenant and the core database.
-
+Nothing published yet.

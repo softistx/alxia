@@ -15,14 +15,13 @@ direction, not a commitment.
   core database, typed to what it owns or depends on. Provisioning, `sync`
   and `migrate` read the registry.
 
+- **Access.** `@alxia/access` reads the membership a scope carries as the
+  viewer's role.
+- **Events.** `@alxia/events` visits the outbox of each tenant through
+  `eachTenant`, one fixed tenant on the `single` store.
+
 ## Next
 
-These integrations are with packages that are planned and not published yet.
-
-- **Access.** `@alxia/access` reading the membership a scope carries as the
-  viewer's role.
-- **Events.** `@alxia/events` visiting the outbox of each tenant through
-  `eachTenant`, one fixed tenant on the `single` store.
 - **A shared contract suite.** The contract the package runs against both
   stores, published for a host's own store or registry to run.
 
